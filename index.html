@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Eternal Night - Optimized Core</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Oswald:wght@500;700&display=swap');
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; min-height: 100dvh; background-color: #000; color: #e0e0e0; font-family: 'Gowun Dodum', sans-serif; overflow: hidden; user-select: none; touch-action: none; }
+        #game-container { position: relative; width: 100vw; height: 100dvh; min-height: 100dvh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        canvas { display: block; background-color: #0a0a0f; touch-action: none; }
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100dvh; min-height: 100dvh; background: rgba(0, 0, 0, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; overflow-y: auto; }
+        h1 { font-family: 'Oswald', sans-serif; font-size: 60px; color: #8a8a8a; text-shadow: 2px 2px 15px #000; margin-bottom: 20px; letter-spacing: 5px; text-align: center; }
+        .class-selection { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 900px; padding: 20px; }
+        .class-card { background: #111; border: 2px solid #333; border-radius: 8px; padding: 15px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .class-card:hover { transform: translateY(-5px); background: #1a1a1a; }
+        .class-card.hunter { border-color: #4da6ff; }
+        .class-card.vampire { border-color: #ff4d4d; }
+        .class-card h2 { margin: 0 0 10px 0; font-size: 20px; }
+        .class-card p { font-size: 13px; color: #aaa; line-height: 1.4; margin: 0; }
+        #hud { position: absolute; top: 15px; left: 15px; right: 15px; display: none; justify-content: space-between; pointer-events: none; z-index: 5; }
+        .stats-box { background: rgba(10, 10, 10, 0.9); border: 1px solid #333; padding: 10px 15px; border-radius: 8px; min-width: 250px; pointer-events: auto; }
+        .bar-container { width: 100%; height: 10px; background: #222; border-radius: 5px; margin: 5px 0 8px 0; border: 1px solid #444; overflow: hidden; }
+        #hp-bar { height: 100%; background: #990000; width: 100%; transition: width 0.1s; }
+        #exp-bar { height: 100%; background: #006699; width: 0%; transition: width 0.1s; }
+        .hud-left { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+        .skills-box { margin-top: 4px; font-size: 10px; color: #ddd; max-width: 320px; max-height: 160px; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; }
+        .skill-item { display: flex; flex-direction: column; margin-bottom: 4px; background: rgba(0,0,0,0.6); padding: 4px; border-radius: 4px; border-left: 2px solid #555; }
+        .skill-badge { display:inline-block; margin-left:5px; padding:1px 4px; border-radius:3px; font-size:9px; font-weight:bold; vertical-align:middle; }
+        .skill-badge.core { color:#ffd700; border:1px solid #8a6d00; background:rgba(255,204,0,0.12); }
+        .skill-badge.recommended { color:#7dd3fc; border:1px solid #28627a; background:rgba(56,189,248,0.10); }
+        .upgrade-badge { display:inline-block; margin-left:6px; padding:2px 5px; border-radius:4px; font-size:10px; font-weight:bold; }
+        .upgrade-badge.core { color:#ffd700; border:1px solid #8a6d00; background:rgba(255,204,0,0.14); }
+        .upgrade-badge.recommended { color:#7dd3fc; border:1px solid #28627a; background:rgba(56,189,248,0.10); }
+
+        .skill-title { color: #ffcc00; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
+        .stage-info { text-align: right; font-size: 20px; font-family: 'Oswald', sans-serif; text-shadow: 2px 2px 5px #000; }
+        #stage-alert { position: absolute; top: 25%; font-family: 'Oswald', sans-serif; font-size: 38px; color: #fff; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 6; text-align: center; text-shadow: 0 0 20px rgba(255,204,0,0.8); width: 100%; padding: 0 20px; box-sizing: border-box; }
+        #action-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 5; }
+        .action-slot { width: 60px; height: 60px; background: rgba(10, 10, 10, 0.9); border: 2px solid #444; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: 'Oswald', sans-serif; position: relative; overflow: hidden; }
+        .action-key { font-size: 20px; font-weight: bold; color: #fff; z-index: 2; }
+        .action-name { font-size: 11px; color: #aaa; z-index: 2; margin-top: 2px; font-family: 'Gowun Dodum', sans-serif; }
+        .cooldown-overlay { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.75); height: 0%; z-index: 1; }
+        .action-ready { border-color: #ffcc00; box-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
+        #mobile-buttons { position: absolute; top: 60px; right: 10px; display: none; flex-direction: column; gap: 8px; z-index: 30; pointer-events: auto; }
+        .m-btn { width: 55px; height: 55px; background: rgba(20,20,20,0.8); border: 2px solid #555; border-radius: 50%; font-size: 24px; display: flex; justify-content: center; align-items: center; position: relative; overflow: hidden; color: white; cursor: pointer; }
+        .m-btn:active { background: rgba(60,60,60,0.9); }
+        .m-btn { touch-action: none; -webkit-user-select: none; user-select: none; }
+        #m-inv-btn { position: absolute; top: 8px; right: 8px; display: none; z-index: 20; }
+        .btn { padding: 10px 30px; background: #333; color: white; border: 1px solid #666; font-size: 20px; cursor: pointer; border-radius: 5px; margin-top: 20px; font-family: 'Gowun Dodum', sans-serif;}
+        .btn:hover { background: #555; }
+        #inventory-screen { display: none; }
+        #level-up-screen { display:none; z-index:50; background:rgba(0,0,0,0.88); }
+        .levelup-subtitle { color:#aaa; margin:0 0 18px; font-size:14px; }
+        .levelup-choices { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; width:min(900px, 92vw); }
+        .upgrade-card { appearance:none; border:2px solid #444; background:linear-gradient(180deg,#171717,#0c0c0c); color:#fff; border-radius:10px; padding:18px 14px; min-height:150px; cursor:pointer; text-align:left; transition:transform .12s,border-color .12s,background .12s; font-family:'Gowun Dodum',sans-serif; }
+        .upgrade-card:hover { transform:translateY(-4px); border-color:#ffcc00; background:#1d1d1d; }
+        .upgrade-key { display:inline-flex; width:24px; height:24px; align-items:center; justify-content:center; border:1px solid #555; border-radius:5px; color:#ffcc00; font-weight:bold; margin-bottom:10px; }
+        .upgrade-icon { font-size:30px; margin-bottom:8px; }
+        .upgrade-name { font-size:17px; font-weight:bold; color:#ffcc00; margin-bottom:7px; }
+        .upgrade-desc { font-size:12px; color:#ccc; line-height:1.5; }
+        @media (max-width:768px) {
+            .levelup-choices { grid-template-columns:1fr; gap:8px; max-height:76vh; overflow-y:auto; padding:4px; box-sizing:border-box; }
+            .upgrade-card { min-height:0; padding:12px; display:grid; grid-template-columns:42px 1fr; grid-template-rows:auto auto; column-gap:10px; align-items:center; }
+            .upgrade-key { grid-row:1 / span 2; margin:0; }
+            .upgrade-icon { display:none; }
+            .upgrade-name { margin:0 0 3px; font-size:15px; }
+            .upgrade-desc { font-size:11px; }
+            .levelup-subtitle { margin-bottom:10px; }
+        }
+
+        .inv-container { display: flex; gap: 40px; background: #111; padding: 20px; border: 2px solid #444; border-radius: 10px; max-width: 90%; }
+        .equip-section, .bag-section { display: flex; flex-direction: column; gap: 10px; }
+        .inv-title { font-size: 18px; color: #ffd700; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px; text-align: center; }
+        .item-slot { width: 200px; height: 55px; background: #222; border: 1px solid #555; border-radius: 5px; display: flex; align-items: center; padding: 5px 10px; cursor: pointer; position: relative; }
+        .item-emoji { font-size: 26px; margin-right: 10px; }
+        .item-info { display: flex; flex-direction: column; }
+        .item-name { font-weight: bold; font-size: 13px; color: #fff; }
+        .item-desc { font-size: 10px; color: #aaa; margin-top: 2px; }
+        .empty-slot { justify-content: center; color: #555; font-style: italic; font-size: 13px; }
+        .rarity-common { border-color:#777; }
+        .rarity-rare { border-color:#244f9e; box-shadow:inset 0 0 0 1px rgba(36,79,158,.35); }
+        .rarity-legendary { border-color:#b08b00; box-shadow:inset 0 0 0 1px rgba(255,215,0,.25); }
+        .rarity-label { font-size:10px; margin-left:4px; opacity:.85; }
+        .craft-section { margin-top:12px; width:100%; max-width:640px; }
+        .craft-title { font-weight:bold; margin-bottom:7px; }
+        #craft-list { max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+        .craft-row { display:grid; grid-template-columns:180px 1fr 58px; gap:7px; align-items:center; background:#151515; border:1px solid #333; border-radius:5px; padding:6px; font-size:11px; }
+        .craft-result { font-weight:bold; }
+        .craft-materials { color:#aaa; line-height:1.35; }
+        .craft-btn { background:#333; color:#fff; border:1px solid #666; border-radius:4px; padding:6px 4px; cursor:pointer; }
+        .craft-btn:disabled { opacity:.3; cursor:default; }
+        .bag-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .shop-card { border-color: #cca300; }
+        .buy-fail { animation: shake 0.3s; color: red !important; }
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-5px); } 100% { transform: translateX(0); } }
+
+        #event-screen { z-index:60; background:rgba(5,5,8,.88); }
+        .event-panel { width:min(560px,88vw); background:#111; border:2px solid #555; border-radius:12px; padding:26px; box-shadow:0 10px 40px rgba(0,0,0,.65); text-align:center; }
+        .event-icon { font-size:54px; margin-bottom:8px; }
+        .event-title { font-size:30px; font-weight:bold; margin-bottom:8px; }
+        .event-desc { color:#aaa; line-height:1.55; margin-bottom:18px; white-space:pre-line; }
+        .event-choices { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+        .event-choice { min-width:170px; padding:13px 16px; border:1px solid #666; border-radius:7px; background:#222; color:#fff; cursor:pointer; font-size:14px; font-weight:bold; }
+        .event-choice:hover { background:#303030; border-color:#aaa; }
+        .event-choice.danger { border-color:#8b3030; }
+        .event-choice.safe { border-color:#386f9c; }
+        .event-choice.reward { border-color:#b08b00; }
+        @media (max-width:768px) {
+            .event-panel { width:min(92vw,520px); padding:20px 14px; }
+            .event-icon { font-size:44px; }
+            .event-title { font-size:24px; }
+            .event-desc { font-size:13px; }
+            .event-choices { flex-direction:column; }
+            .event-choice { width:100%; min-width:0; }
+        }
+
+        @media (max-width: 768px) {
+            #hud { top: 8px; left: 8px; right: 8px; }
+            .stats-box { min-width: 170px; max-width: 42vw; padding: 6px 9px; border-radius: 6px; font-size: 10px; }
+            .stats-box > div:first-child { font-size: 10px !important; }
+            .bar-container { height: 7px; margin: 3px 0 5px 0; }
+            .hud-left { align-items: flex-start; max-width: 46vw; }
+            .skills-box {
+                width: min(46vw, 280px);
+                max-width: 46vw;
+                max-height: 22vh;
+                margin-top: 4px;
+                padding: 3px;
+                font-size: 8px;
+                line-height: 1.15;
+                overflow-y: auto;
+                overflow-x: hidden;
+                background: rgba(10,10,10,0.82);
+                border: 1px solid rgba(90,90,90,0.8);
+                border-radius: 5px;
+                box-sizing: border-box;
+                z-index: 7;
+                pointer-events: none;
+            }
+            .skill-item { padding: 3px 4px; margin-bottom: 2px; }
+            .skill-title { font-size: 9px; }
+            .stage-info { font-size: 14px; margin-right: 54px; }
+            .stage-info > div:nth-child(2) { font-size: 10px !important; }
+            #mobile-buttons { top: auto; right: 12px; bottom: 18px; gap: 8px; z-index: 30; pointer-events: auto; }
+            .m-btn { width: 50px !important; height: 50px !important; font-size: 24px !important; border-width: 1px; touch-action: manipulation; pointer-events: auto; }
+            #m-inv-btn { top: 8px; right: 8px; width: 40px !important; height: 40px !important; font-size: 18px !important; z-index: 35; }
+            h1 { font-size: 34px; }
+            .class-selection { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 10px; }
+            .class-card { padding: 10px; }
+            #inventory-screen { justify-content: flex-start; align-items: center; padding: 58px 8px 24px; box-sizing: border-box; }
+            #inventory-screen .inv-container { flex-direction: column; gap: 12px; padding: 12px; width: 100%; max-width: 100%; max-height: calc(100dvh - 82px); overflow-y: auto; overflow-x: hidden; box-sizing: border-box; }
+            #inventory-screen .equip-section, #inventory-screen .bag-section { width: 100%; }
+            .item-slot { width: 100%; box-sizing: border-box; }
+            .craft-row { grid-template-columns:1fr 1fr 52px; font-size:10px; }
+            #craft-list { max-height:30vh; }
+            #pc-hint { display: none; }
+        }
+        @media (max-width: 768px) and (orientation: landscape) {
+            #hud { top: 5px; left: 6px; right: 6px; }
+            .stats-box { min-width: 145px; max-width: 28vw; padding: 4px 7px; }
+            .hud-left { max-width: 34vw; }
+            .skills-box {
+                width: 34vw;
+                max-width: 34vw;
+                max-height: 30vh;
+                font-size: 7px;
+            }
+            .stage-info { font-size: 12px; margin-right: 48px; }
+            #mobile-buttons { top: auto; right: 12px; bottom: 18px; gap: 8px; flex-direction: column; }
+            .m-btn { width: 50px !important; height: 50px !important; font-size: 24px !important; }
+            #m-inv-btn { top: 6px; right: 6px; width: 36px !important; height: 36px !important; font-size: 15px !important; z-index: 35; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="stage-alert">B1 FLOOR</div>
+        <div id="hud">
+            <div class="hud-left">
+                <div class="stats-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span><span id="class-name" style="font-weight:bold;">Class</span> <span style="font-size:12px;">Lv.<span id="level-text">1</span></span></span>
+                        <span style="color: #ffd700; font-weight: bold;">🪙 <span id="gold-text">0</span></span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:11px; color:#ccc;"><span>HP</span><span id="hp-text"></span></div><div class="bar-container"><div id="hp-bar"></div></div>
+                    <div style="display:flex; justify-content:space-between; font-size:10px; color:#aaa;"><span>EXP</span><span id="exp-text"></span></div><div class="bar-container" style="height: 6px; margin-bottom: 2px;"><div id="exp-bar"></div></div>
+                </div>
+                <div class="skills-box" id="skills-list"></div>
+            </div>
+            <div class="stage-info">
+                <div id="stage-text">지하 1층</div>
+                <div style="font-size: 14px; color: #aaa;">남은 마물: <span id="enemy-count">0</span></div>
+                <div id="pc-hint" style="font-size: 12px; color: #ffcc00; margin-top: 5px; background: rgba(0,0,0,0.6); padding: 5px; border-radius: 4px;">[I] 인벤토리 열기</div>
+            </div>
+        </div>
+
+        <div id="action-bar">
+            <div class="action-slot" id="slot-dash"><div class="cooldown-overlay" id="cd-dash"></div><div class="action-key">SPACE</div><div class="action-name">회피기</div></div>
+            <div class="action-slot" id="slot-ult"><div class="cooldown-overlay" id="cd-ult"></div><div class="action-key">Q</div><div class="action-name">궁극기</div></div>
+        </div>
+
+        <div id="mobile-buttons">
+            <div class="m-btn" id="m-dash" onpointerdown="event.preventDefault(); event.stopPropagation(); useDash()"><div class="cooldown-overlay" id="m-cd-dash"></div>💨</div>
+            <div class="m-btn" id="m-ult" onpointerdown="event.preventDefault(); event.stopPropagation(); useUltimate()"><div class="cooldown-overlay" id="m-cd-ult"></div>🔥</div>
+        </div>
+        <div class="m-btn" id="m-inv-btn" onpointerdown="event.preventDefault(); event.stopPropagation(); toggleInventory()">🎒</div>
+
+        <div id="start-screen" class="overlay">
+            <h1>ETERNAL NIGHT</h1>
+            <p style="margin-bottom: 20px; color: #888; font-size: 14px; text-align: center;">미로를 탐험하고 마지막 방의 보스를 처치하여 다음 층(🌀)으로 이동하세요.</p>
+            <div class="class-selection">
+                <div class="class-card hunter" onclick="startGame('gunner')"><h2>🕵️‍♂️ 거너</h2></div>
+                <div class="class-card hunter" onclick="startGame('warrior')"><h2>🥷 무사</h2></div>
+                <div class="class-card hunter" onclick="startGame('cleric')"><h2>🧙‍♂️ 성직자</h2></div>
+                <div class="class-card vampire" onclick="startGame('combat_vamp')"><h2>🧛 전투 뱀파이어</h2></div>
+                <div class="class-card vampire" onclick="startGame('magic_vamp')"><h2>🧛‍♀️ 마법 뱀파이어</h2></div>
+            </div>
+        </div>
+
+        <div id="inventory-screen" class="overlay">
+            <h1 style="color: #fff; margin-bottom: 10px; font-size: 30px;">장비 인벤토리</h1>
+            <div class="inv-container">
+                <div class="equip-section">
+                    <div class="inv-title">장착 중</div>
+                    <div id="slot-weapon" class="item-slot empty-slot" onclick="unequipItem('weapon')">무기 없음</div>
+                    <div id="slot-armor" class="item-slot empty-slot" onclick="unequipItem('armor')">방어구 없음</div>
+                    <div id="slot-accessory" class="item-slot empty-slot" onclick="unequipItem('accessory')">장신구 없음</div>
+                </div>
+                <div class="bag-section"><div class="inv-title">가방 (터치하여 장착)</div><div class="bag-grid" id="bag-list"></div></div>
+                <div class="craft-section"><div class="craft-title">⚒️ 장비 조합</div><div id="craft-list"></div></div>
+            </div>
+            <button class="btn" onclick="toggleInventory()">닫기</button>
+        </div>
+
+        <div id="shop-screen" class="overlay" style="display: none;">
+            <h1 style="color: #ffd700; font-size: 40px;">방랑 상인</h1>
+            <p style="font-size: 20px; margin-bottom: 20px;">보유 골드: <span style="color:#ffd700">🪙 <span id="shop-gold-text">0</span></span></p>
+            <div class="class-selection">
+                <div class="class-card shop-card" onclick="buyItem('potion')"><h2>🧪 체력 포션</h2><p style="margin-top: 10px; font-weight: bold;" id="cost-potion">비용: 20 G</p></div>
+                <div class="class-card shop-card" onclick="buyItem('weapon')"><h2>⚔️ 무기 연마 <span id="wpn-lv-text">Lv.1</span></h2><p style="margin-top: 10px; font-weight: bold;" id="cost-weapon">비용: 50 G</p></div>
+                <div class="class-card shop-card" onclick="buyItem('armor')"><h2>🛡️ 방어구 강화 <span id="arm-lv-text">Lv.1</span></h2><p style="margin-top: 10px; font-weight: bold;" id="cost-armor">비용: 50 G</p></div>
+            </div>
+            <button class="btn" onclick="nextFloor()">다음 층으로 이동</button>
+        </div>
+
+
+
+        <div id="event-screen" class="overlay" style="display:none;">
+            <div class="event-panel">
+                <div id="event-icon" class="event-icon">❓</div>
+                <div id="event-title" class="event-title">특수 방</div>
+                <div id="event-desc" class="event-desc"></div>
+                <div id="event-choices" class="event-choices"></div>
+            </div>
+        </div>
+
+        <div id="level-up-screen" class="overlay">
+            <h1 style="color:#ffcc00; font-size:46px; margin-bottom:6px;">LEVEL UP!</h1>
+            <p class="levelup-subtitle">원하는 성장 효과 하나를 선택하세요</p>
+            <div id="levelup-choices" class="levelup-choices"></div>
+        </div>
+        <div id="game-over-screen" class="overlay" style="display: none;">
+            <h1 style="color:red;">YOU DIED IN THE DARK</h1>
+            <p id="final-score" style="font-size: 24px; color: #aaa;"></p>
+            <button class="btn" onclick="location.reload()">처음부터 다시</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        let screenMouseX = 0;
+        let screenMouseY = 0;
+        let isMouseDown = false;
+
+        function resizeCanvas() {
+            const width = Math.max(1, Math.floor(window.visualViewport ? window.visualViewport.width : window.innerWidth));
+            const height = Math.max(1, Math.floor(window.visualViewport ? window.visualViewport.height : window.innerHeight));
+            canvas.width = width;
+            canvas.height = height;
+            screenMouseX = width * 0.5;
+            screenMouseY = height * 0.5;
+        }
+        window.addEventListener('resize', resizeCanvas, { passive: true });
+        window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 250), { passive: true });
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeCanvas, { passive: true });
+
+        function fastRemove(arr, index) {
+            if (index === arr.length - 1) { arr.pop(); }
+            else { arr[index] = arr.pop(); }
+        }
+
+        function distSq(x1, y1, x2, y2) {
+            return (x1 - x2) ** 2 + (y1 - y2) ** 2;
+        }
+
+        const isMobile = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+        const getZoom = () => isMobile ? (window.innerWidth > window.innerHeight ? 0.34 : 0.46) : 1;
+
+        const levelUpScreen = document.getElementById("level-up-screen"), levelUpChoices = document.getElementById("levelup-choices");
+        const hud = document.getElementById("hud"), startScreen = document.getElementById("start-screen"), shopScreen = document.getElementById("shop-screen"), invScreen = document.getElementById("inventory-screen"), gameOverScreen = document.getElementById("game-over-screen"), actionBar = document.getElementById("action-bar");
+        const hpBar = document.getElementById("hp-bar"), expBar = document.getElementById("exp-bar"), hpText = document.getElementById("hp-text"), expText = document.getElementById("exp-text"), levelText = document.getElementById("level-text"), stageText = document.getElementById("stage-text"), enemyCountText = document.getElementById("enemy-count"), stageAlert = document.getElementById("stage-alert"), skillsList = document.getElementById("skills-list");
+        const eventScreen = document.getElementById("event-screen"), eventIcon = document.getElementById("event-icon"), eventTitle = document.getElementById("event-title"), eventDesc = document.getElementById("event-desc"), eventChoices = document.getElementById("event-choices");
+        const cdDashOverlay = document.getElementById("cd-dash"), cdUltOverlay = document.getElementById("cd-ult"), slotDash = document.getElementById("slot-dash"), slotUlt = document.getElementById("slot-ult");
+        const mCdDash = document.getElementById("m-cd-dash"), mCdUlt = document.getElementById("m-cd-ult");
+        const goldText = document.getElementById("gold-text"), shopGoldText = document.getElementById("shop-gold-text"), costPotionText = document.getElementById("cost-potion"), costWeaponText = document.getElementById("cost-weapon"), costArmorText = document.getElementById("cost-armor"), wpnLvText = document.getElementById("wpn-lv-text"), armLvText = document.getElementById("arm-lv-text");
+
+        const tileSize = 60; const mapCols = 40; const mapRows = 40;
+        let mapGrid = []; let camera = { x: 0, y: 0 }; let portal = { x: -100, y: -100, active: false };
+        const keys = {};
+        let isPlaying = false, isInvOpen = false, isLevelUpOpen = false, animationId, lastTime = 0, currentFloor = 1;
+        let pendingLevelUps = 0;
+        let activeEvent = null;
+        let specialRoom = null;
+
+        let enemies = [], projectiles = [], enemyProjectiles = [], aoeZones = [], items = [], visualEffects = [], stageProps = [], traps = [], breakables = [], altars = [];
+        const joys = { left: { active: false, cx: 0, cy: 0, nx: 0, ny: 0, id: null }, right: { active: false, cx: 0, cy: 0, nx: 0, ny: 0, id: null } };
+        // 모바일: 오른쪽 조이스틱은 '누르고 있는 동안만 공격'이 아니라 마지막 조준 방향을 유지합니다.
+        let mobileAimAngle = 0;
+        let shakeMag = 0;
+        const uiState = { hp: -1, maxHp: -1, exp: -1, maxExp: -1, level: -1, floor: -1, count: -1, dash: -1, ult: -1, gold: -1 };
+
+        resizeCanvas();
+
+        const passiveDefs = {
+            gunner: [
+                { id: 'multishot', name: '연쇄 탄환', tier: 'recommended', desc: '적중 시 일정 확률로 주변 적에게 탄환이 튕겨 나갑니다' },
+                { id: 'crit', name: '치명타 조준', tier: 'core', desc: '치명타 확률 +10%/Lv' },
+                { id: 'dodge', name: '전술 구르기', tier: 'recommended', desc: '회피 확률 +5%/Lv' },
+                { id: 'rapidfire', name: '속사 개조', tier: 'core', desc: '공격 간격 -4%/Lv' },
+                { id: 'sniper', name: '저격 자세', tier: 'core', desc: '300 이상 거리의 적에게 피해 +5%/Lv, 사거리 +50, 탄속 +0.4/Lv' }
+            ],
+            warrior: [
+                { id: 'blade_wave', name: '검압', tier: 'core', desc: '공격 적중이 누적되면 강력한 관통 검기를 발사합니다' },
+                { id: 'aura', name: '검기 폭풍', tier: 'core', desc: '적중 시 일정 확률로 주변에 추가 검기 피해' },
+                { id: 'toughness', name: '강인함', tier: 'recommended', desc: '접촉 및 지속 피해를 고정 감소' },
+                { id: 'berserk', name: '광전사의 피', tier: 'recommended', desc: 'HP 50% 이하에서 공격력 +10%/Lv' },
+                { id: 'blade_master', name: '검성의 일격', tier: 'core', desc: '공격 피해 +6%/Lv' }
+            ],
+            cleric: [
+                { id: 'nova', name: '대천사의 폭발', tier: 'core', desc: '적중 시 거대한 신성 폭발' },
+                { id: 'regeneration', name: '성스러운 연쇄', tier: 'core', desc: '처치 시 회복하며 일정 확률로 주변에 신성 폭발' },
+                { id: 'vitality', name: '강건한 믿음', tier: 'recommended', desc: '최대 HP +20/Lv' },
+                { id: 'holyguard', name: '신성한 가호', tier: 'recommended', desc: '받는 피해 -4%/Lv' },
+                { id: 'smite', name: '심판의 빛', tier: 'core', desc: '적중 시 12%/Lv 확률로 추가 신성타격' }
+            ],
+            combat_vamp: [
+                { id: 'bats', name: '흡혈 박쥐', tier: 'core', desc: '적중 시 박쥐 떼 방출 (Lv.당 발동 확률 20%)' },
+                { id: 'vampirism', name: '피의 갈증', tier: 'recommended', desc: '적 처치 시 회복량 +1/Lv' },
+                { id: 'shadow', name: '그림자 보법', tier: 'recommended', desc: '이동속도 +0.4/Lv, 회피 +4%/Lv' },
+                { id: 'bloodlust', name: '피의 광란', tier: 'core', desc: 'HP가 낮을수록 공격력 최대 +12%/Lv' },
+                { id: 'feast', name: '피의 만찬', tier: 'core', desc: '처치 시 주변을 폭발시키고 연쇄 처치를 일으킵니다' }
+            ],
+            magic_vamp: [
+                { id: 'eruption', name: '피의 분출', tier: 'core', desc: '적중 시 주변 폭발 피해' },
+                { id: 'poison', name: '부패하는 피', tier: 'core', desc: '적중한 적에게 지속 피해' },
+                { id: 'mana_shield', name: '혈마법 보호막', tier: 'recommended', desc: '받는 피해 -8%/Lv' },
+                { id: 'bloodpower', name: '혈마법 증폭', tier: 'recommended', desc: '공격 피해 +5%/Lv' },
+                { id: 'contagion', name: '전염의 저주', tier: 'core', desc: '중독이 주변 적에게 퍼지고, 전염된 적은 추가 피해를 받습니다' }
+            ]
+        };
+
+        const classData = {
+            gunner: { name: '거너', hp: 120, speed: 3.0, damage: 30, atkRate: 220, projSpeed: 11, range: 600, projRadius: 10, pierce: false, emoji: '🕵️‍♂️', weapon: '🔫', projEmoji: '💨' },
+            warrior: { name: '무사', hp: 200, speed: 3.4, damage: 65, atkRate: 380, projSpeed: 14, range: 100, projRadius: 28, pierce: true, emoji: '🥷', weapon: '🗡️', projEmoji: '🌙' },
+            cleric: { name: '성직자', hp: 140, speed: 2.8, damage: 45, atkRate: 380, projSpeed: 8, range: 500, projRadius: 15, pierce: false, emoji: '🧙‍♂️', weapon: '🪄', projEmoji: '☄️' },
+            combat_vamp: { name: '전투 뱀파이어', hp: 150, speed: 4.0, damage: 40, atkRate: 220, projSpeed: 14, range: 80, projRadius: 20, pierce: true, emoji: '🧛', weapon: '🩸', projEmoji: '🗡️' },
+            magic_vamp: { name: '마법 뱀파이어', hp: 90, speed: 3.0, damage: 55, atkRate: 480, projSpeed: 6, range: 600, projRadius: 12, pierce: false, emoji: '🧛‍♀️', weapon: '🔮', projEmoji: '🔮' }
+        };
+
+        // 장비는 데이터 중심으로 관리합니다. 일반 몬스터/상자는 일반등급만 직접 드랍하고, 상위 등급은 조합으로 제작합니다.
+        const itemDatabase = [
+            { id:'w1', rarity:'common', classes:['combat_vamp','warrior'], name:'피바라기 단검', slot:'weapon', emoji:'🗡️', desc:'공격력 +20, 공속 상승', stat:{dmg:20,atkRate:-30} },
+            { id:'w2', rarity:'common', classes:['warrior','combat_vamp'], name:'파멸의 대검', slot:'weapon', emoji:'🪓', desc:'공격력 +50, 이속 둔화', stat:{dmg:50,spd:-0.3} },
+            { id:'w3', rarity:'common', classes:['gunner'], name:'사냥꾼의 활', slot:'weapon', emoji:'🏹', desc:'공격력 +12, 사거리 +80, 탄속 +1', stat:{dmg:12,range:80,projSpeed:1} },
+            { id:'w4', rarity:'common', classes:['warrior','cleric'], name:'전투 망치', slot:'weapon', emoji:'🔨', desc:'공격력 +35, 최대체력 +20', stat:{dmg:35,hp:20} },
+            { id:'a1', rarity:'common', classes:['gunner','combat_vamp','magic_vamp'], name:'바람의 망토', slot:'armor', emoji:'🧥', desc:'이동속도 +1.0', stat:{spd:1} },
+            { id:'a2', rarity:'common', classes:['warrior','cleric'], name:'거인의 갑옷', slot:'armor', emoji:'🛡️', desc:'최대체력 +100', stat:{hp:100} },
+            { id:'a3', rarity:'common', classes:['gunner','combat_vamp','magic_vamp'], name:'가죽 갑옷', slot:'armor', emoji:'🥋', desc:'최대체력 +40, 이동속도 +0.3', stat:{hp:40,spd:0.3} },
+            { id:'a4', rarity:'common', classes:['warrior','cleric','combat_vamp'], name:'가시 갑옷', slot:'armor', emoji:'🌵', desc:'최대체력 +60, 처치 체력회복 +2', stat:{hp:60,killHeal:2} },
+            { id:'ac1', rarity:'common', classes:['warrior','combat_vamp'], name:'신속의 반지', slot:'accessory', emoji:'💍', desc:'대시 쿨타임 1초 감소', stat:{dashCd:-1000} },
+            { id:'ac2', rarity:'common', classes:['combat_vamp','magic_vamp'], name:'흡혈의 목걸이', slot:'accessory', emoji:'📿', desc:'처치 체력회복 +5', stat:{killHeal:5} },
+            { id:'ac3', rarity:'common', classes:['gunner','combat_vamp'], name:'질풍 팔찌', slot:'accessory', emoji:'🪬', desc:'공격속도 상승', stat:{atkRate:-20} },
+            { id:'ac4', rarity:'common', classes:['cleric','magic_vamp'], name:'생명 부적', slot:'accessory', emoji:'📿', desc:'최대체력 +50', stat:{hp:50} },
+            { id:'rw1', rarity:'rare', name:'핏빛 단검', slot:'weapon', emoji:'🗡️', desc:'공격력 +35, 공속 크게 상승', stat:{dmg:35,atkRate:-45} },
+            { id:'rw2', rarity:'rare', name:'멸망의 대검', slot:'weapon', emoji:'⚔️', desc:'공격력 +75, 이속 둔화', stat:{dmg:75,spd:-0.4} },
+            { id:'rw3', rarity:'rare', name:'폭풍 사냥활', slot:'weapon', emoji:'🏹', desc:'공격력 +25, 사거리 +150, 탄속 +1.5', stat:{dmg:25,range:150,projSpeed:1.5} },
+            { id:'ra1', rarity:'rare', name:'질풍의 망토', slot:'armor', emoji:'🧥', desc:'이동속도 +1.6', stat:{spd:1.6} },
+            { id:'ra2', rarity:'rare', name:'거인의 중갑', slot:'armor', emoji:'🛡️', desc:'최대체력 +180', stat:{hp:180} },
+            { id:'ra3', rarity:'rare', name:'가시 전투갑옷', slot:'armor', emoji:'🦔', desc:'최대체력 +100, 처치 체력회복 +3', stat:{hp:100,killHeal:3} },
+            { id:'rac1', rarity:'rare', name:'초신속 반지', slot:'accessory', emoji:'💍', desc:'대시 쿨타임 2.5초 감소, 공속 상승', stat:{dashCd:-2500,atkRate:-20} },
+            { id:'rac2', rarity:'rare', name:'피의 성배', slot:'accessory', emoji:'🏆', desc:'최대체력 +30, 처치 체력회복 +10', stat:{hp:30,killHeal:10} },
+            { id:'lw1', rarity:'legendary', name:'붉은 송곳니', slot:'weapon', emoji:'🩸', desc:'공격력 +70, 공속 크게 상승, 처치 회복 +5', stat:{dmg:70,atkRate:-70,killHeal:5} },
+            { id:'lw2', rarity:'legendary', name:'종말의 대검', slot:'weapon', emoji:'☠️', desc:'공격력 +120, 최대체력 +50, 이속 둔화', stat:{dmg:120,hp:50,spd:-0.5} },
+            { id:'la1', rarity:'legendary', name:'천상의 망토', slot:'armor', emoji:'🪽', desc:'이동속도 +2.0, 최대체력 +80', stat:{spd:2,hp:80} },
+            { id:'la2', rarity:'legendary', name:'불멸의 갑주', slot:'armor', emoji:'🏰', desc:'최대체력 +300, 처치 회복 +5', stat:{hp:300,killHeal:5} },
+            { id:'lac1', rarity:'legendary', name:'혈왕의 왕관', slot:'accessory', emoji:'👑', desc:'공격력 +40, 최대체력 +120, 처치 회복 +12, 대시 쿨타임 2초 감소', stat:{dmg:40,hp:120,killHeal:12,dashCd:-2000} }
+        ];
+        const commonEquipment=itemDatabase.filter(i=>i.rarity==='common'), rareEquipment=itemDatabase.filter(i=>i.rarity==='rare'), legendaryEquipment=itemDatabase.filter(i=>i.rarity==='legendary');
+        const rarityNames={common:'일반',rare:'희귀',legendary:'전설'}, rarityColors={common:'#eeeeee',rare:'#244f9e',legendary:'#ffd700'};
+        // 일반 몬스터 장비 드랍률: 1층 1% → 9층 5%, 10층 이상 5%. 클래스 시너지가 있는 일반템은 40% 가중치로 우선합니다.
+        function getCommonDropChance(floor) { return Math.min(0.05, 0.01 + Math.max(0, floor - 1) * 0.005); }
+        function pickCommonEquipment() {
+            if (!commonEquipment.length) return null;
+            const preferred = commonEquipment.filter(item => item.classes && item.classes.includes(player.classType));
+            if (preferred.length && Math.random() < 0.40) return preferred[Math.floor(Math.random() * preferred.length)];
+            return commonEquipment[Math.floor(Math.random() * commonEquipment.length)];
+        }
+        const craftRecipes=[
+            {result:'rw1',materials:['w1','ac3','ac2']},{result:'rw2',materials:['w2','w4','a2']},{result:'rw3',materials:['w3','ac3','w1']},
+            {result:'ra1',materials:['a1','a3','ac3']},{result:'ra2',materials:['a2','a4','w4']},{result:'ra3',materials:['a4','a2','ac2']},
+            {result:'rac1',materials:['ac1','ac3','a1']},{result:'rac2',materials:['ac2','ac4','a4']},
+            {result:'lw1',materials:['rw1','rw3','rac2']},{result:'lw2',materials:['rw2','rw1','ra2']},{result:'la1',materials:['ra1','rw3','rac1']},{result:'la2',materials:['ra2','ra3','rw2']},{result:'lac1',materials:['rac1','rac2','rw1']}
+        ];
+        const player = { x: 0, y: 0, radius: 20, classType: '', level: 1, exp: 0, maxExp: 120, passives: {}, passiveCounters: {}, upgradeDamage: 0, upgradeAtkRate: 0, upgradeMaxHp: 0, upgradeSpeed: 0, upgradeProjSpeed: 0, upgradeRange: 0, dashCd: 0, maxDashCd: 20000, ultCd: 0, maxUltCd: 15000, buffs: { frenzyTime: 0 }, gold: 0, weaponLv: 1, armorLv: 1, bag: [], equip: { weapon: null, armor: null, accessory: null }, killHeal: 0, dashInvuln: 0, hitFlash: 0 };
+        let shopPrices = { potion: 20, weapon: 50, armor: 50 };
+
+        window.addEventListener("keydown", e => { if (e.code === "Space") e.preventDefault(); if (isLevelUpOpen && ["Digit1","Digit2","Digit3"].includes(e.code)) { const btn = levelUpChoices.children[Number(e.code.slice(-1))-1]; if (btn) btn.click(); return; } keys[e.code] = true; if (e.code === "KeyI" && player.classType !== '' && player.hp > 0 && shopScreen.style.display === "none") toggleInventory(); });
+        window.addEventListener("keyup", e => keys[e.code] = false);
+        canvas.addEventListener("mousemove", e => { if(!isMobile) { screenMouseX = e.clientX; screenMouseY = e.clientY; }});
+        canvas.addEventListener("mousedown", () => { if(!isMobile) isMouseDown = true; });
+        canvas.addEventListener("mouseup", () => { if(!isMobile) isMouseDown = false; });
+
+        if (isMobile) {
+            function pointerPos(e) { const rect = canvas.getBoundingClientRect(); return { x:(e.clientX-rect.left)*(canvas.width/rect.width), y:(e.clientY-rect.top)*(canvas.height/rect.height) }; }
+            function updateJoy(joy,e) { const p=pointerPos(e), dx=p.x-joy.cx, dy=p.y-joy.cy, len=Math.hypot(dx,dy), max=60; if(len>0){const strength=Math.min(1,len/max); joy.nx=(dx/len)*strength; joy.ny=(dy/len)*strength;}else{joy.nx=0;joy.ny=0;} }
+            function releaseJoy(joy,id){ if(joy.active&&joy.id===id) Object.assign(joy,{active:false,id:null,nx:0,ny:0}); }
+            canvas.addEventListener('pointerdown',e=>{ if(e.pointerType==='mouse')return; e.preventDefault(); const p=pointerPos(e); if(p.x<=canvas.width/2&&!joys.left.active){Object.assign(joys.left,{active:true,id:e.pointerId,cx:p.x,cy:p.y,nx:0,ny:0}); try{canvas.setPointerCapture(e.pointerId);}catch(_){} updateJoy(joys.left,e);} },{passive:false});
+            canvas.addEventListener('pointermove',e=>{ if(e.pointerType==='mouse')return; if(joys.left.active&&e.pointerId===joys.left.id){e.preventDefault();updateJoy(joys.left,e);} },{passive:false});
+            const endPointer=e=>{if(e.pointerType!=='mouse')releaseJoy(joys.left,e.pointerId);};
+            canvas.addEventListener('pointerup',endPointer,{passive:false}); canvas.addEventListener('pointercancel',endPointer,{passive:false}); canvas.addEventListener('lostpointercapture',endPointer,{passive:false});
+        }
+
+        function calcStats() {
+            let baseMaxHp = classData[player.classType].hp + (player.level-1)*15 + (player.armorLv-1)*20;
+            const passive = player.passives || {};
+            player.damage = classData[player.classType].damage + (player.weaponLv-1)*10 + player.upgradeDamage;
+            player.speed = classData[player.classType].speed + player.upgradeSpeed;
+            player.atkRate = Math.max(80, classData[player.classType].atkRate - player.upgradeAtkRate);
+            if (player.classType === 'gunner') {
+                player.atkRate *= Math.max(0.55, 1 - (passive.rapidfire || 0) * 0.04);
+            }
+            if (player.classType === 'combat_vamp') {
+                player.speed += (passive.shadow || 0) * 0.4;
+            }
+            if (player.classType === 'cleric') {
+                baseMaxHp += (passive.vitality || 0) * 20;
+            }
+            if (player.classType === 'magic_vamp') {
+                player.damage *= (1 + (passive.bloodpower || 0) * 0.05);
+            }
+            player.maxDashCd = 20000; player.killHeal = 0;
+
+            Object.values(player.equip).forEach(eq => {
+                if(!eq) return;
+                if(eq.stat.hp) baseMaxHp += eq.stat.hp; if(eq.stat.dmg) player.damage += eq.stat.dmg;
+                if(eq.stat.spd) player.speed += eq.stat.spd; if(eq.stat.atkRate) player.atkRate += eq.stat.atkRate;
+                if(eq.stat.dashCd) player.maxDashCd += eq.stat.dashCd; if(eq.stat.killHeal) player.killHeal += eq.stat.killHeal;
+            });
+            baseMaxHp += player.upgradeMaxHp;
+            player.maxHp = baseMaxHp; player.hp = Math.min(player.hp, player.maxHp);
+            player.projSpeed = classData[player.classType].projSpeed + player.upgradeProjSpeed;
+            player.range = classData[player.classType].range + player.upgradeRange;
+            Object.values(player.equip).forEach(eq=>{ if(!eq) return; if(eq.stat.projSpeed) player.projSpeed += eq.stat.projSpeed; if(eq.stat.range) player.range += eq.stat.range; });
+            if (player.classType === 'gunner') {
+                player.projSpeed += (passive.sniper || 0) * 0.4;
+                player.range += (passive.sniper || 0) * 50;
+            }
+            uiState.hp = -1;
+        }
+
+        function toggleInventory() { isInvOpen = !isInvOpen; if (isInvOpen) { isPlaying = false; invScreen.style.display = "flex"; renderInventory(); } else { invScreen.style.display = "none"; isPlaying = true; lastTime = performance.now(); requestAnimationFrame(gameLoop); } }
+        function getItemDef(id){ return itemDatabase.find(item=>item.id===id); }
+        function getBagCount(id){ return player.bag.reduce((n,item)=>n+(item.id===id?1:0),0); }
+        function canCraft(recipe){ const need={}; recipe.materials.forEach(id=>need[id]=(need[id]||0)+1); return Object.entries(need).every(([id,n])=>getBagCount(id)>=n); }
+        function craftItem(index){ const recipe=craftRecipes[index]; if(!recipe||!canCraft(recipe)) return; const result=getItemDef(recipe.result); recipe.materials.forEach(id=>{const i=player.bag.findIndex(x=>x.id===id); if(i>=0) player.bag.splice(i,1);}); player.bag.push(result); stageAlert.innerText=`✨ ${rarityNames[result.rarity]} 제작! ${result.name}`; stageAlert.style.color=rarityColors[result.rarity]; stageAlert.style.opacity=1; setTimeout(()=>stageAlert.style.opacity=0,1800); renderInventory(); }
+        function renderInventory() {
+            ['weapon','armor','accessory'].forEach(slot=>{ const el=document.getElementById(`slot-${slot}`); if(player.equip[slot]){const item=player.equip[slot]; el.className=`item-slot rarity-${item.rarity}`; el.innerHTML=`<div class="item-emoji">${item.emoji}</div><div class="item-info"><div class="item-name" style="color:${rarityColors[item.rarity]}">${item.name} <span class="rarity-label">${rarityNames[item.rarity]}</span></div><div class="item-desc">${item.desc}</div></div>`;}else{el.className='item-slot empty-slot';el.innerHTML=`${slot==='weapon'?'무기':slot==='armor'?'방어구':'장신구'} 비어있음`;}});
+            const bagTitle=document.querySelector('#inventory-screen .bag-section .inv-title'); if(bagTitle) bagTitle.innerText=`가방 (${player.bag.length}/8) · 터치하여 장착`;
+            const bagList=document.getElementById('bag-list'); bagList.innerHTML=''; player.bag.forEach((item,index)=>{const c=rarityColors[item.rarity]||'#fff';bagList.innerHTML+=`<div class="item-slot rarity-${item.rarity}" onclick="equipItem(${index})"><div class="item-emoji">${item.emoji}</div><div class="item-info"><div class="item-name" style="color:${c}">${item.name} <span class="rarity-label">${rarityNames[item.rarity]||''}</span></div><div class="item-desc">${item.desc}</div></div></div>`;});
+            for(let i=player.bag.length;i<8;i++) bagList.innerHTML+=`<div class="item-slot empty-slot">빈 공간</div>`;
+            const craftList=document.getElementById('craft-list'); if(craftList) craftList.innerHTML=craftRecipes.map((r,i)=>{const result=getItemDef(r.result),ready=canCraft(r),mats=r.materials.map(id=>{const m=getItemDef(id);return `${m.emoji} ${m.name} ${getBagCount(id)}/1`;}).join(' + ');return `<div class="craft-row"><div class="craft-result" style="color:${rarityColors[result.rarity]}">${result.emoji} ${result.name} <span>${rarityNames[result.rarity]}</span></div><div class="craft-materials">${mats}</div><button class="craft-btn" ${ready?'':'disabled'} onclick="craftItem(${i})">조합</button></div>`;}).join('');
+        }
+        function equipItem(bagIndex) {
+            const item = player.bag[bagIndex];
+            if (!item) return;
+            const slot = item.slot;
+            // 같은 슬롯에 장비가 이미 있다면 기존 장비가 가방으로 돌아가야 하므로,
+            // 가방에 빈칸이 없으면 장착을 막아 9/8 상태가 되는 것을 방지합니다.
+            if (player.equip[slot] && player.bag.length >= 8) {
+                stageAlert.innerText = `⚠️ 가방이 꽉 찼습니다! 기존 장비를 넣을 공간이 필요합니다.`;
+                stageAlert.style.color = "#ff4d4d";
+                stageAlert.style.opacity = 1;
+                setTimeout(() => stageAlert.style.opacity = 0, 1800);
+                return;
+            }
+            if (player.equip[slot]) player.bag.push(player.equip[slot]);
+            player.equip[slot] = item;
+            player.bag.splice(bagIndex, 1);
+            calcStats();
+            renderInventory();
+        }
+        function unequipItem(slot) { if (!player.equip[slot]) return; if (player.bag.length >= 8) { alert("가방이 꽉 찼습니다!"); return; } player.bag.push(player.equip[slot]); player.equip[slot] = null; calcStats(); renderInventory(); }
+        function openShop() { isPlaying = false; hud.style.display = "none"; if(!isMobile) actionBar.style.display = "none"; else { document.getElementById("mobile-buttons").style.display = "none"; document.getElementById("m-inv-btn").style.display = "none"; } shopScreen.style.display = "flex"; updateShopUI(); }
+        function nextFloor() { activeEvent = null; eventScreen.style.display = "none"; shopScreen.style.display = "none"; hud.style.display = "flex"; if(!isMobile) actionBar.style.display = "flex"; else { document.getElementById("mobile-buttons").style.display = "flex"; document.getElementById("m-inv-btn").style.display = "flex"; } startFloor(currentFloor + 1); isPlaying = true; requestAnimationFrame(gameLoop); }
+        function updateShopUI() { shopGoldText.innerText = player.gold; costPotionText.innerText = `비용: ${shopPrices.potion} G`; costWeaponText.innerText = `비용: ${shopPrices.weapon} G`; costArmorText.innerText = `비용: ${shopPrices.armor} G`; wpnLvText.innerText = `Lv.${player.weaponLv}`; armLvText.innerText = `Lv.${player.armorLv}`; }
+        function triggerBuyFail(elementId) { const el = document.getElementById(elementId); el.classList.add('buy-fail'); setTimeout(() => el.classList.remove('buy-fail'), 300); }
+        function buyItem(itemType) {
+            if (itemType === 'potion') { if (player.gold >= shopPrices.potion && player.hp < player.maxHp) { player.gold -= shopPrices.potion; player.hp = Math.min(player.maxHp, player.hp + 50); updateShopUI(); } else triggerBuyFail('cost-potion'); }
+            else if (itemType === 'weapon') { if (player.gold >= shopPrices.weapon) { player.gold -= shopPrices.weapon; player.weaponLv++; shopPrices.weapon = Math.floor(shopPrices.weapon * 1.5); calcStats(); updateShopUI(); } else triggerBuyFail('cost-weapon'); }
+            else if (itemType === 'armor') { if (player.gold >= shopPrices.armor) { player.gold -= shopPrices.armor; player.hp += 20; player.armorLv++; shopPrices.armor = Math.floor(shopPrices.armor * 1.5); calcStats(); updateShopUI(); } else triggerBuyFail('cost-armor'); }
+        }
+
+        function generateDungeon() {
+            mapGrid = Array.from({length: mapRows}, () => Array(mapCols).fill(1));
+            let rooms = []; let numRooms = 6 + Math.floor(Math.random() * 4);
+            for(let i=0; i<numRooms; i++) {
+                let rw = 5 + Math.floor(Math.random() * 5); let rh = 5 + Math.floor(Math.random() * 5);
+                let rx = 2 + Math.floor(Math.random() * (mapCols - rw - 4)); let ry = 2 + Math.floor(Math.random() * (mapRows - rh - 4));
+                for(let y=ry; y<ry+rh; y++) { for(let x=rx; x<rx+rw; x++) mapGrid[y][x] = 0; }
+                if (rw >= 7 && rh >= 7 && Math.random() < 0.6) { let px = rx + Math.floor(rw/2) - 1; let py = ry + Math.floor(rh/2) - 1; mapGrid[py][px] = 1; mapGrid[py][px+1] = 1; mapGrid[py+1][px] = 1; mapGrid[py+1][px+1] = 1; }
+                let center = { x: Math.floor(rx + rw/2), y: Math.floor(ry + rh/2), rx: rx, ry: ry, rw: rw, rh: rh }; rooms.push(center);
+                if (i > 0) {
+                    let prev = rooms[i-1]; let cur = center; let minX = Math.min(prev.x, cur.x), maxX = Math.max(prev.x, cur.x); let minY = Math.min(prev.y, cur.y), maxY = Math.max(prev.y, cur.y);
+                    if (Math.random() < 0.5) { for(let x=minX; x<=maxX; x++) { mapGrid[prev.y][x] = 0; mapGrid[prev.y+1][x] = 0; } for(let y=minY; y<=maxY; y++) { mapGrid[y][cur.x] = 0; mapGrid[y][cur.x+1] = 0; } }
+                    else { for(let y=minY; y<=maxY; y++) { mapGrid[y][prev.x] = 0; mapGrid[y][prev.x+1] = 0; } for(let x=minX; x<=maxX; x++) { mapGrid[cur.y][x] = 0; mapGrid[cur.y+1][x] = 0; } }
+                }
+            } return rooms;
+        }
+
+        function checkWallCollision(newX, newY, radius) {
+            let leftCol = Math.floor((newX - radius) / tileSize); let rightCol = Math.floor((newX + radius) / tileSize);
+            let topRow = Math.floor((newY - radius) / tileSize); let bottomRow = Math.floor((newY + radius) / tileSize);
+            if (leftCol < 0 || rightCol >= mapCols || topRow < 0 || bottomRow >= mapRows) return true;
+            for (let r = topRow; r <= bottomRow; r++) { for (let c = leftCol; c <= rightCol; c++) { if (mapGrid[r][c] === 1) return true; } }
+            return false;
+        }
+
+        function showAlert(text, color, duration = 2000) {
+    stageAlert.innerText = text;
+    stageAlert.style.color = color;
+    stageAlert.style.opacity = 1;
+    clearTimeout(showAlert._t);
+    showAlert._t = setTimeout(() => {
+        stageAlert.style.opacity = 0;
+    }, duration);
+}
+
+function setGameUIVisible(visible) {
+    hud.style.display = visible ? 'flex' : 'none';
+    const mobileButtons = document.getElementById('mobile-buttons');
+    const mobileInventory = document.getElementById('m-inv-btn');
+    if (isMobile) {
+        if (mobileButtons) mobileButtons.style.display = visible ? 'flex' : 'none';
+        if (mobileInventory) mobileInventory.style.display = visible ? 'flex' : 'none';
+    } else {
+        actionBar.style.display = visible ? 'flex' : 'none';
+    }
+}
+
+
+        const eventRoomTypes = [
+            {type:'treasure', icon:'💎', title:'비밀 보물방', weight:40},
+            {type:'shrine', icon:'⛲', title:'생명의 샘', weight:30},
+            {type:'altar', icon:'🩸', title:'피의 제단', weight:30}
+        ];
+
+        function pickEventRoomType() {
+            let roll = Math.random() * eventRoomTypes.reduce((sum,e)=>sum+e.weight,0);
+            for (const event of eventRoomTypes) {
+                roll -= event.weight;
+                if (roll <= 0) return event.type;
+            }
+            return 'treasure';
+        }
+
+        function closeEventRoom() {
+            eventScreen.style.display = 'none';
+            activeEvent = null;
+            isPlaying = true;
+            lastTime = performance.now();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function showEventRoom(type) {
+            const configs = {
+                treasure:{
+                    icon:'💎', title:'비밀 보물방',
+                    desc:'오래된 보물 상자가 놓여 있습니다.\n상자를 열면 일반 장비 1개를 얻습니다.',
+                    choices:[
+                        {text:'🎁 보물 상자를 연다', cls:'reward', action:()=>{
+                            if(player.bag.length<8){
+                                const reward=pickCommonEquipment();
+                                player.bag.push(reward);
+                                renderInventory();
+                                showAlert(`🎁 보물 획득! ${reward.name}`,rarityColors.common,2200);
+                            }else{
+                                player.gold+=25;
+                                showAlert('🪙 가방이 가득 차 있어 대신 25 G를 획득했습니다.','#ffd700',2200);
+                            }
+                            specialRoom.used=true; closeEventRoom();
+                        }},
+                        {text:'돌아간다', cls:'safe', action:()=>{specialRoom.used=true;closeEventRoom();}}
+                    ]
+                },
+                shrine:{
+                    icon:'⛲', title:'생명의 샘',
+                    desc:'어둠 속에서 신비로운 샘물이 빛나고 있습니다.\n마시면 잃은 체력의 일부를 회복할 수 있습니다.',
+                    choices:[
+                        {text:'💚 샘물을 마신다 (+35% HP)', cls:'safe', action:()=>{
+                            const before=player.hp;
+                            player.hp=Math.min(player.maxHp,player.hp+player.maxHp*0.35);
+                            showAlert(`💚 생명의 샘: HP +${Math.max(0,Math.floor(player.hp-before))}`,'#66dd88',1800);
+                            specialRoom.used=true; closeEventRoom();
+                        }},
+                        {text:'그냥 지나간다', cls:'safe', action:()=>{specialRoom.used=true;closeEventRoom();}}
+                    ]
+                },
+                altar:{
+                    icon:'🩸', title:'피의 제단',
+                    desc:'제단이 당신의 피와 힘을 교환하겠다고 속삭입니다.\n현재 HP의 20%를 바치면 공격력이 +20 증가합니다.',
+                    choices:[
+                        {text:'🩸 피를 바친다 (HP -20%, 공격력 +20)', cls:'danger', action:()=>{
+                            const sacrifice=Math.max(1,player.hp*0.20);
+                            player.hp=Math.max(1,player.hp-sacrifice);
+                            player.damage+=20;
+                            calcStats();
+                            visualEffects.push({x:specialRoom.x,y:specialRoom.y-30,emoji:'🩸',size:70,life:35,maxLife:35});
+                            showAlert('🩸 피의 계약: 공격력 +20','#ff4d4d',1800);
+                            specialRoom.used=true; closeEventRoom();
+                        }},
+                        {text:'제단을 떠난다', cls:'safe', action:()=>{specialRoom.used=true;closeEventRoom();}}
+                    ]
+                }
+            };
+            const config=configs[type];
+            if(!config) return;
+            activeEvent=type;
+            isPlaying=false;
+            eventIcon.innerText=config.icon;
+            eventTitle.innerText=config.title;
+            eventDesc.innerText=config.desc;
+            eventChoices.innerHTML='';
+            config.choices.forEach(choice=>{
+                const btn=document.createElement('button');
+                btn.className=`event-choice ${choice.cls||''}`;
+                btn.innerText=choice.text;
+                btn.addEventListener('click',choice.action,{once:true});
+                eventChoices.appendChild(btn);
+            });
+            eventScreen.style.display='flex';
+        }
+
+        function tryEnterSpecialRoom() {
+            if(!specialRoom || specialRoom.used || activeEvent || isLevelUpOpen) return false;
+            if(distSq(player.x,player.y,specialRoom.x,specialRoom.y)<2600){
+                showEventRoom(specialRoom.type);
+                return true;
+            }
+            return false;
+        }
+
+function startGame(type) {
+            startScreen.style.display = "none"; hud.style.display = "flex";
+            if(isMobile) { document.getElementById("mobile-buttons").style.display = "flex"; document.getElementById("m-inv-btn").style.display = "flex"; }
+            else { actionBar.style.display = "flex"; }
+            player.classType = type; player.passives = {}; player.passiveCounters = {}; Object.assign(player, { ...classData[type], maxHp: classData[type].hp, attackCooldown: 0, level: 1, exp: 0, maxExp: 120, upgradeDamage: 0, upgradeAtkRate: 0, upgradeMaxHp: 0, upgradeSpeed: 0, upgradeProjSpeed: 0, upgradeRange: 0, gold: 0, weaponLv: 1, armorLv: 1, bag: [], equip: { weapon:null, armor:null, accessory:null }, killHeal:0, dashCd:0, ultCd:0, dashInvuln:0 });
+            pendingLevelUps = 0; isLevelUpOpen = false; levelUpScreen.style.display = 'none';
+            document.getElementById("class-name").innerText = `${player.emoji} ${player.name}`;
+            passiveDefs[type].forEach(p => player.passives[p.id] = 0);
+            updateSkillsUI(); calcStats(); startFloor(1); isPlaying = true; requestAnimationFrame(gameLoop);
+        }
+
+        function getFloorCombatConfig(floor) {
+            // 층별 전투량을 고정된 기준으로 잡고, 방 배치만 소폭 랜덤하게 합니다.
+            // 분열 슬라임/소환사 추가 소환은 별도 변수가므로 실제 남은 마물 수는 목표치보다 늘어날 수 있습니다.
+            return {
+                targetEnemies: Math.min(45, 18 + (floor - 1) * 3),
+                eliteChance: Math.min(0.20, 0.08 + (floor - 1) * 0.015),
+                summonerChance: 0.10,
+                slimeChance: 0.15,
+                rangedChance: 0.15,
+                dashChance: 0.15
+            };
+        }
+
+        function buildRoomEnemyCounts(totalEnemies, roomCount) {
+            const counts = [];
+            let remaining = totalEnemies;
+            let remainingRooms = roomCount;
+            for (let i = 0; i < roomCount; i++) {
+                const minCount = Math.max(1, Math.floor(remaining / remainingRooms));
+                const extra = (remaining % remainingRooms) > 0 ? 1 : 0;
+                counts.push(minCount + extra);
+                remaining -= counts[i];
+                remainingRooms--;
+            }
+            // 어느 방에 1마리를 더 배치할지는 랜덤하게 섞어 방별 패턴만 변화시킵니다.
+            for (let i = counts.length - 1; i > 0; i--) {
+                const j = (Math.random() * (i + 1)) | 0;
+                [counts[i], counts[j]] = [counts[j], counts[i]];
+            }
+            return counts;
+        }
+
+        function startFloor(floor) {
+            currentFloor = floor; enemies = []; projectiles = []; enemyProjectiles = []; aoeZones = []; items = []; visualEffects = []; stageProps = []; traps = []; breakables = []; altars = []; portal.active = false;
+            const combatConfig = getFloorCombatConfig(floor);
+            const isBossFloor = floor % 5 === 0;
+            let rooms = generateDungeon();
+            // 용 보스는 5층마다 등장합니다. 일반 층은 마지막 방도 일반 전투방으로 사용합니다.
+            const normalRoomCount = Math.max(1, rooms.length - (isBossFloor ? 2 : 1));
+            const specialRoomIndex = rooms.length > 3
+                ? 2 + Math.floor(Math.random() * Math.max(1, rooms.length - 3))
+                : 1;
+            specialRoom = {
+                roomIndex: specialRoomIndex,
+                x: rooms[specialRoomIndex].x * tileSize,
+                y: rooms[specialRoomIndex].y * tileSize,
+                type: pickEventRoomType(),
+                used: false
+            };
+            const roomEnemyCounts = buildRoomEnemyCounts(combatConfig.targetEnemies, normalRoomCount);
+            let normalRoomIndex = 0;
+            player.x = rooms[0].x * tileSize; player.y = rooms[0].y * tileSize;
+            if(checkWallCollision(player.x, player.y, 20)) { player.x += tileSize*2; player.y += tileSize*2; }
+            let bossRoom = rooms[rooms.length - 1]; portal.x = bossRoom.x * tileSize; portal.y = bossRoom.y * tileSize;
+
+            let altarSpawned = false;
+            for(let i=1; i<rooms.length; i++) {
+                let r = rooms[i]; let rx = r.x * tileSize; let ry = r.y * tileSize;
+                if(checkWallCollision(rx, ry, 20)) continue;
+                if (i === specialRoomIndex) continue; // 특수 이벤트 방(보물/샘/제단)은 일반 몬스터·함정·상자를 두지 않습니다.
+
+                if (!altarSpawned && Math.random() < 0.3) { altars.push({ x: rx, y: ry, radius: 25, emoji: '⛩️', used: false }); altarSpawned = true; }
+                let boxCount = Math.random() < 0.4 ? 1 : 0;
+                for(let b=0; b<boxCount; b++) { let bx = (r.rx + 1 + Math.random() * (r.rw - 2)) * tileSize; let by = (r.ry + 1 + Math.random() * (r.rh - 2)) * tileSize; if(!checkWallCollision(bx, by, 20)) breakables.push({ x: bx, y: by, radius: 20, emoji: '📦', hp: 1 }); }
+                let trapCount = Math.random() < 0.3 ? 1 : 0;
+                for(let t=0; t<trapCount; t++) { let tx = (r.rx + 1 + Math.random() * (r.rw - 2)) * tileSize; let ty = (r.ry + 1 + Math.random() * (r.rh - 2)) * tileSize; if(!checkWallCollision(tx, ty, 25)) traps.push({ x: tx, y: ty, radius: 25, active: false, timer: Math.random() * 2000 }); }
+
+                if (i === rooms.length - 1 && isBossFloor) { enemies.push({ x: rx, y: ry, radius: 45, emoji: '🐉', hp: 800 + floor*200, maxHp: 800 + floor*200, speed: 0.9, damage: 45, exp: 300, type: 'boss', phase2: false, lastAoE: 0, lastBullet: 0 }); }
+                else {
+                    const count = roomEnemyCounts[normalRoomIndex++] || 1;
+                    for(let j=0; j<count; j++) {
+                        let ex = rx + (Math.random()-0.5)*tileSize*3; let ey = ry + (Math.random()-0.5)*tileSize*3;
+                        if(checkWallCollision(ex, ey, 18)) { ex = rx; ey = ry; }
+                        let rand = Math.random();
+                        const eliteCut = combatConfig.eliteChance;
+                        const summonerCut = eliteCut + combatConfig.summonerChance;
+                        const slimeCut = summonerCut + combatConfig.slimeChance;
+                        const rangedCut = slimeCut + combatConfig.rangedChance;
+                        const dashCut = rangedCut + combatConfig.dashChance;
+                        if (rand < eliteCut) enemies.push({ x: ex, y: ey, radius: 25, emoji: '👹', hp: 200 + floor*50, maxHp: 200 + floor*50, speed: 1.0, damage: 25, exp: 60, type: 'elite' });
+                        else if (rand < summonerCut) enemies.push({ x: ex, y: ey, radius: 20, emoji: '🧙‍♀️', hp: 80 + floor*20, maxHp: 80 + floor*20, speed: 0.72, damage: 10, exp: 30, type: 'summoner', lastSummon: 0 });
+                        else if (rand < slimeCut) enemies.push({ x: ex, y: ey, radius: 22, emoji: '🦠', hp: 70 + floor*15, maxHp: 70 + floor*15, speed: 0.9, damage: 15, exp: 15, type: 'slime', sizeLevel: 2 });
+                        else if (rand < rangedCut) enemies.push({ x: ex, y: ey, radius: 18, emoji: '🏹', hp: 50 + floor*15, maxHp: 50 + floor*15, speed: 0.63, damage: 20 + floor*2, exp: 20, type: 'ranged', lastShot: 0 });
+                        else if (rand < dashCut) enemies.push({ x: ex, y: ey, radius: 18, emoji: '🐺', hp: 60 + floor*15, maxHp: 60 + floor*15, speed: 1.26, damage: 15 + floor, exp: 20, type: 'dash', isDashing: false, lastDash: 0 });
+                        else enemies.push({ x: ex, y: ey, radius: 18, emoji: '🧟', hp: 50 + floor*15, maxHp: 50 + floor*15, speed: 1.08, damage: 12 + floor, exp: 15, type: 'normal' });
+                    }
+                }
+            }
+
+            const propsEmoji = ['🪦', '🥀', '🕸️', '🦴'];
+            for(let i=0; i < 15 + floor*2; i++) { let px = Math.random() * (mapCols * tileSize); let py = Math.random() * (mapRows * tileSize); if(!checkWallCollision(px, py, 10)) stageProps.push({ x: px, y: py, emoji: propsEmoji[Math.floor(Math.random() * propsEmoji.length)], size: 20 + Math.random() * 20 }); }
+            stageAlert.innerText = `B${floor} FLOOR`; stageAlert.style.color = "#fff"; stageAlert.style.opacity = 1; setTimeout(() => stageAlert.style.opacity = 0, 2000);
+            lastTime = performance.now();
+        }
+
+        function getMobileAutoAimAngle() {
+            let target = null, bestScore = Infinity;
+            for (const e of enemies) {
+                if (e.hp <= 0) continue;
+                const d2 = distSq(player.x, player.y, e.x, e.y);
+                const bossBonus = e.type === 'boss' ? -100000000 : 0;
+                const eliteBonus = e.type === 'elite' ? -25000 : 0;
+                const score = d2 + bossBonus + eliteBonus;
+                if (score < bestScore) { bestScore = score; target = e; }
+            }
+            if (target) mobileAimAngle = Math.atan2(target.y - player.y, target.x - player.x);
+            return mobileAimAngle;
+        }
+
+        function updatePlayer(dt, time) {
+            if (player.dashInvuln > 0) player.dashInvuln = Math.max(0, player.dashInvuln - dt);
+            if (player.dashCd > 0) player.dashCd -= dt; if (player.ultCd > 0) player.ultCd -= dt; if (player.buffs.frenzyTime > 0) player.buffs.frenzyTime -= dt;
+
+            let dx = 0, dy = 0; let spd = player.speed;
+            if (player.buffs.frenzyTime > 0) spd *= 1.5;
+
+            if (isMobile) { if (joys.left.active) { dx = joys.left.nx; dy = joys.left.ny; } }
+            else {
+                if (keys["KeyW"] || keys["ArrowUp"]) dy -= 1; if (keys["KeyS"] || keys["ArrowDown"]) dy += 1;
+                if (keys["KeyA"] || keys["ArrowLeft"]) dx -= 1; if (keys["KeyD"] || keys["ArrowRight"]) dx += 1;
+                if (dx !== 0 && dy !== 0) { const len = Math.sqrt(dx*dx + dy*dy); dx /= len; dy /= len; }
+                if (keys["Space"]) useDash(); if (keys["KeyQ"]) useUltimate();
+            }
+
+            let nextX = player.x + dx * spd; let nextY = player.y + dy * spd;
+            if (!checkWallCollision(nextX, player.y, player.radius)) player.x = nextX;
+            if (!checkWallCollision(player.x, nextY, player.radius)) player.y = nextY;
+
+            if (portal.active && distSq(player.x, player.y, portal.x, portal.y) < 2500) { openShop(); return; }
+            if (tryEnterSpecialRoom()) return;
+
+            for (let i = 0; i < altars.length; i++) {
+                let a = altars[i];
+                if (!a.used && distSq(player.x, player.y, a.x, a.y) < (player.radius + a.radius)**2) {
+                    player.maxHp -= 20; player.hp = Math.min(player.hp, player.maxHp); player.damage += 15; a.used = true; calcStats();
+                    visualEffects.push({ x: a.x, y: a.y - 30, emoji: '🩸', size: 60, life: 40, maxLife: 40 });
+                    stageAlert.innerText = "❤️ 제단 계약: 최대체력-20 / 공격력+15"; stageAlert.style.color = "#ff4d4d"; stageAlert.style.opacity = 1; setTimeout(() => stageAlert.style.opacity = 0, 2000);
+                }
+            }
+
+            const zoom = getZoom();
+            const viewWorldW = canvas.width / zoom;
+            const viewWorldH = canvas.height / zoom;
+            const targetCameraX = player.x - viewWorldW / 2;
+            const targetCameraY = player.y - viewWorldH / 2;
+            const cameraLerp = isMobile ? 0.16 : 1.0;
+            camera.x += (targetCameraX - camera.x) * cameraLerp;
+            camera.y += (targetCameraY - camera.y) * cameraLerp;
+            camera.x = Math.max(0, Math.min(camera.x, mapCols * tileSize - viewWorldW));
+            camera.y = Math.max(0, Math.min(camera.y, mapRows * tileSize - viewWorldH));
+
+            // Vampire Survivors식 자동 공격: 이동과 공격 방향을 완전히 독립시킵니다.
+            if (isMobile) {
+                shoot(time, getMobileAutoAimAngle());
+            } else {
+                const angle = Math.atan2(screenMouseY + camera.y - player.y, screenMouseX + camera.x - player.x);
+                shoot(time, angle);
+            }
+        }
+
+        function updateProjectiles(dt, time) {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                if (p.isBat && enemies.length > 0) {
+                    let target = null, bestD = Infinity;
+                    for (const e of enemies) { const d = distSq(p.x, p.y, e.x, e.y); if (d < bestD) { bestD = d; target = e; } }
+                    let ang = Math.atan2(target.y - p.y, target.x - p.x); p.vx = Math.cos(ang) * 8; p.vy = Math.sin(ang) * 8;
+                }
+                p.x += p.vx; p.y += p.vy;
+
+                if (checkWallCollision(p.x, p.y, p.radius) || distSq(p.x, p.y, p.startX, p.startY) > p.maxRange**2) { fastRemove(projectiles, i); continue; }
+
+                let pRemoved = false;
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    let enemy = enemies[j];
+                    if (p.hitTargets.includes(enemy)) continue;
+                    if (distSq(p.x, p.y, enemy.x, enemy.y) < (p.radius + enemy.radius)**2) {
+                        enemy.hp -= p.damage;
+                        enemy.hitFlash = 6;
+                        if (!p.isProc) triggerPassives(p, enemy, time);
+                        if (p.pierce) p.hitTargets.push(enemy); else { fastRemove(projectiles, i); pRemoved = true; break; }
+                    }
+                }
+                if(pRemoved) continue;
+
+                for (let j = breakables.length - 1; j >= 0; j--) {
+                    let b = breakables[j];
+                    if (distSq(p.x, p.y, b.x, b.y) < (p.radius + b.radius)**2) {
+                        b.hp--; visualEffects.push({ x: b.x, y: b.y, emoji: '💢', size: 30, life: 10, maxLife: 10 });
+                        if (b.hp <= 0) {
+                            if(Math.random() < 0.15) items.push({ x: b.x, y: b.y, radius: 12, emoji: '🧪', type: 'potion' });
+                            else { for(let g=0; g<2; g++) items.push({ x: b.x + (Math.random()-0.5)*30, y: b.y + (Math.random()-0.5)*30, radius: 8, emoji: '🪙', type: 'gold', value: 5 }); }
+                            fastRemove(breakables, j);
+                        }
+                        if (p.pierce) p.hitTargets.push(b); else { fastRemove(projectiles, i); break; }
+                    }
+                }
+            }
+
+            for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+                let p = enemyProjectiles[i]; p.x += p.vx; p.y += p.vy;
+                if (checkWallCollision(p.x, p.y, p.radius) || distSq(p.x, p.y, p.startX, p.startY) > p.maxRange**2) { fastRemove(enemyProjectiles, i); continue; }
+                if (distSq(p.x, p.y, player.x, player.y) < (p.radius + player.radius)**2) { if (player.dashInvuln <= 0) { player.hp -= p.damage; player.hitFlash = 8; } fastRemove(enemyProjectiles, i); }
+            }
+        }
+
+        function triggerPassives(p, enemy, time) {
+            const lv = player.passives || {};
+
+            // 거너: 연쇄 탄환 - 적중 시 주변 적에게 추가 탄환이 튕깁니다.
+            if (lv.multishot > 0 && Math.random() < Math.min(0.85, lv.multishot * 0.15)) {
+                const candidates = enemies
+                    .filter(e => e !== enemy && e.hp > 0 && distSq(e.x, e.y, enemy.x, enemy.y) < 14400)
+                    .sort((a, b) => distSq(a.x, a.y, enemy.x, enemy.y) - distSq(b.x, b.y, enemy.x, enemy.y))
+                    .slice(0, 2);
+                candidates.forEach(target => {
+                    const ang = Math.atan2(target.y - enemy.y, target.x - enemy.x);
+                    projectiles.push({ x: enemy.x, y: enemy.y, startX: enemy.x, startY: enemy.y, radius: Math.max(7, p.radius * 0.75), maxRange: 260, vx: Math.cos(ang) * player.projSpeed * 1.05, vy: Math.sin(ang) * player.projSpeed * 1.05, damage: p.damage * 0.7, pierce: false, hitTargets: [enemy], emoji: player.projEmoji, isBat: false, isProc: true });
+                });
+                if (candidates.length) visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '🔗', size: 55 + lv.multishot * 5, life: 14, maxLife: 14 });
+            }
+
+            // 무사: 검기 폭풍 - 적중 시 주변에 추가 검기 피해.
+            if (lv.aura > 0 && Math.random() < Math.min(0.75, lv.aura * 0.18)) {
+                const radius = 70 + lv.aura * 15;
+                const burstDamage = p.damage * (0.8 + lv.aura * 0.15);
+                visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '🌪️', size: radius * 1.2, life: 18, maxLife: 18 });
+                enemies.forEach(e => { if (e !== enemy && e.hp > 0 && distSq(e.x, e.y, enemy.x, enemy.y) < radius * radius) e.hp -= burstDamage; });
+            }
+
+            // 무사: 검압 - 일정 횟수의 적중을 누적한 뒤 강력한 관통 검기를 발사합니다.
+            if (player.classType === 'warrior' && lv.blade_wave > 0) {
+                const waveLv = lv.blade_wave;
+                player.passiveCounters.blade_wave = (player.passiveCounters.blade_wave || 0) + 1;
+                const requiredHits = Math.max(2, 6 - waveLv);
+                if (player.passiveCounters.blade_wave >= requiredHits) {
+                    player.passiveCounters.blade_wave = 0;
+                    const ang = Math.atan2(p.vy, p.vx);
+                    const waveDamage = p.damage * (0.9 + waveLv * 0.15);
+                    const waveRange = 280 + waveLv * 40;
+                    projectiles.push({ x: enemy.x, y: enemy.y, startX: enemy.x, startY: enemy.y, radius: 24 + waveLv * 2, maxRange: waveRange, vx: Math.cos(ang) * 16, vy: Math.sin(ang) * 16, damage: waveDamage, pierce: true, hitTargets: [enemy], emoji: '🌙', isBat: false, isProc: true });
+                    visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '⚔️', size: 70 + waveLv * 8, life: 16, maxLife: 16 });
+                }
+            }
+
+            // 성직자: 대천사의 폭발
+            if (lv.nova > 0 && Math.random() < Math.min(1.0, lv.nova * 0.1)) {
+                visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '✨', size: 150, life: 30, maxLife: 30 });
+                enemies.forEach(e => { if (e.hp > 0 && distSq(e.x, e.y, enemy.x, enemy.y) < 22500) e.hp -= p.damage * (1 + lv.nova * 0.3); });
+            }
+
+            // 전투 뱀파이어: 흡혈 박쥐
+            if (lv.bats > 0 && Math.random() < Math.min(1.0, lv.bats * 0.2)) {
+                const batCount = Math.min(10, 1 + lv.bats);
+                for (let b = 0; b < batCount; b++) projectiles.push({ x: enemy.x, y: enemy.y, startX: enemy.x, startY: enemy.y, radius: 10, maxRange: 500, vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15, damage: p.damage*0.5, pierce: false, hitTargets: [], emoji: '🦇', isBat: true, isProc: true });
+            }
+
+            // 마법 뱀파이어: 피의 분출
+            if (lv.eruption > 0 && Math.random() < Math.min(1.0, lv.eruption * 0.1)) {
+                visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '💥', size: 100, life: 25, maxLife: 25 });
+                enemies.forEach(e => { if (e.hp > 0 && distSq(e.x, e.y, enemy.x, enemy.y) < 10000) e.hp -= p.damage * 2.5; });
+            }
+
+            // 성직자: 심판의 빛
+            if (lv.smite > 0 && Math.random() < Math.min(0.6, lv.smite * 0.12)) {
+                visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '☀️', size: 55, life: 18, maxLife: 18 });
+                enemy.hp -= p.damage * (0.7 + lv.smite * 0.15);
+            }
+
+            // 마법 뱀파이어: 부패 + 전염
+            if (lv.poison > 0) {
+                enemy.poison = { time: time, dmg: lv.poison * 3 };
+                if (lv.contagion > 0 && Math.random() < Math.min(0.75, lv.contagion * 0.15)) {
+                    enemies.forEach(e => {
+                        if (e !== enemy && e.hp > 0 && distSq(e.x, e.y, enemy.x, enemy.y) < 19600) e.poison = { time: time, dmg: lv.poison * (2 + lv.contagion * 0.25) };
+                    });
+                    visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '☠️', size: 65 + lv.contagion * 4, life: 15, maxLife: 15 });
+                }
+            }
+        }
+
+        function updateEnemies(dt, time) {
+            let isBossAlive = false; let needSkillUpdate = false;
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let enemy = enemies[i];
+                if (enemy.hitFlash > 0) enemy.hitFlash--;
+                if(enemy.type === 'boss') isBossAlive = true;
+
+                let distSqToPlayer = distSq(player.x, player.y, enemy.x, enemy.y);
+                if (distSqToPlayer > 1000000) continue;
+
+                let angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+                if (enemy.poison && time - enemy.poison.time > 500) { enemy.hp -= enemy.poison.dmg; enemy.poison.time = time; visualEffects.push({ x: enemy.x, y: enemy.y - 20, emoji: '🫧', size: 20, life: 10, maxLife: 10 }); }
+
+                let exDx = 0, exDy = 0;
+                if (enemy.type === 'summoner') {
+                    if (distSqToPlayer < 160000) { exDx = -Math.cos(angle) * enemy.speed; exDy = -Math.sin(angle) * enemy.speed; }
+                    else if (distSqToPlayer > 250000) { exDx = Math.cos(angle) * enemy.speed; exDy = Math.sin(angle) * enemy.speed; }
+                    if (time - enemy.lastSummon > 5000) {
+                        let sx = enemy.x + 30; let sy = enemy.y; if(checkWallCollision(sx, sy, 18)) { sx = enemy.x; sy = enemy.y; }
+                        enemies.push({ x: sx, y: sy, radius: 18, emoji: '🧟', hp: 50 + currentFloor*15, maxHp: 50 + currentFloor*15, speed: 1.08, damage: 12 + currentFloor, exp: 5, type: 'normal' });
+                        visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '✨', size: 30, life: 15, maxLife: 15 }); enemy.lastSummon = time;
+                    }
+                } else if (enemy.type === 'ranged') {
+                    if (distSqToPlayer > 90000) { exDx = Math.cos(angle) * enemy.speed; exDy = Math.sin(angle) * enemy.speed; }
+                    if (distSqToPlayer < 360000 && time - enemy.lastShot > 3500) { enemyProjectiles.push({ x: enemy.x, y: enemy.y, startX: enemy.x, startY: enemy.y, radius: 10, maxRange: 600, vx: Math.cos(angle)*4.5, vy: Math.sin(angle)*4.5, damage: enemy.damage, emoji: '🔥' }); enemy.lastShot = time; }
+                } else if (enemy.type === 'dash') {
+                    if (distSqToPlayer < 62500 && !enemy.isDashing && time - enemy.lastDash > 4000) { enemy.isDashing = true; enemy.dashTime = time; enemy.dashAngle = angle; }
+                    if (enemy.isDashing) { exDx = Math.cos(enemy.dashAngle) * (enemy.speed * 3.2); exDy = Math.sin(enemy.dashAngle) * (enemy.speed * 3.2); visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '💨', size: 15, life: 5, maxLife: 5 }); if (time - enemy.dashTime > 400) { enemy.isDashing = false; enemy.lastDash = time; } } else { exDx = Math.cos(angle) * enemy.speed; exDy = Math.sin(angle) * enemy.speed; }
+                } else if (enemy.type === 'boss') {
+                    if (!enemy.phase2 && enemy.hp < enemy.maxHp * 0.5) {
+                        enemy.phase2 = true; enemy.speed *= 1.3; visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '💢', size: 100, life: 30, maxLife: 30 });
+                        triggerShake(24);
+                        stageAlert.innerText = "BOSS PHASE 2!"; stageAlert.style.color = "#ff0000"; stageAlert.style.opacity = 1; setTimeout(() => stageAlert.style.opacity = 0, 1500);
+                    }
+                    exDx = Math.cos(angle) * enemy.speed; exDy = Math.sin(angle) * enemy.speed;
+                    if (distSqToPlayer < 640000 && time - enemy.lastAoE > 7000) { aoeZones.push({ x: player.x, y: player.y, radius: 150, timer: 1500, maxTimer: 1500, damage: enemy.damage * 1.5 }); enemy.lastAoE = time; }
+                    if (enemy.phase2 && time - (enemy.lastBullet||0) > 4000) { for(let i=0; i<Math.PI*2; i+=Math.PI/4) enemyProjectiles.push({ x: enemy.x, y: enemy.y, startX: enemy.x, startY: enemy.y, radius: 12, maxRange: 600, vx: Math.cos(i)*6, vy: Math.sin(i)*6, damage: enemy.damage, emoji: '🔥' }); enemy.lastBullet = time; }
+                } else { exDx = Math.cos(angle) * enemy.speed; exDy = Math.sin(angle) * enemy.speed; }
+
+                if (!checkWallCollision(enemy.x + exDx, enemy.y, enemy.radius)) enemy.x += exDx;
+                if (!checkWallCollision(enemy.x, enemy.y + exDy, enemy.radius)) enemy.y += exDy;
+
+                if (distSqToPlayer < (player.radius + enemy.radius)**2) {
+                    if (Math.random() > ((player.passives['dodge'] || 0) * 0.05 + (player.passives['shadow'] || 0) * 0.04)) {
+                        let incomingDmg = enemy.damage * (dt / 1000);
+                    if (player.dashInvuln > 0) incomingDmg = 0;
+                        if (player.passives['mana_shield'] > 0) incomingDmg *= (1 - (player.passives['mana_shield'] * 0.08));
+                        if (player.passives['holyguard'] > 0) incomingDmg *= (1 - (player.passives['holyguard'] * 0.04));
+                        if (player.passives['toughness'] > 0) incomingDmg = Math.max(0, incomingDmg - (player.passives['toughness'] * 2));
+                        player.hp -= incomingDmg;
+                        if (incomingDmg > 0.05) player.hitFlash = 6;
+                    }
+                }
+
+                if (enemy.hp <= 0) {
+                    if (player.classType === 'combat_vamp') player.hp = Math.min(player.maxHp, player.hp + 2 + (player.passives['vampirism'] || 0));
+                    if (player.passives['regeneration'] > 0) player.hp = Math.min(player.maxHp, player.hp + player.passives['regeneration'] * 4);
+                    if (player.killHeal > 0) player.hp = Math.min(player.maxHp, player.hp + player.killHeal);
+
+                    // 성직자: 성스러운 연쇄 - 처치가 주변 신성 폭발로 이어집니다.
+                    if (player.classType === 'cleric' && player.passives['regeneration'] > 0 && Math.random() < Math.min(0.75, player.passives['regeneration'] * 0.15)) {
+                        const holyLv = player.passives['regeneration'];
+                        const holyRadius = 80 + holyLv * 12;
+                        const holyDamage = player.damage * (0.75 + holyLv * 0.12);
+                        enemies.forEach(e => { if (e !== enemy && e.hp > 0 && distSq(e.x, e.y, enemy.x, enemy.y) < holyRadius * holyRadius) e.hp -= holyDamage; });
+                        visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '✨', size: holyRadius * 1.5, life: 20, maxLife: 20 });
+                    }
+
+                    // 전투 뱀파이어: 피의 만찬 - 처치가 주변 피해를 만들고,
+                    // 그 피해로 죽은 적도 다음 프레임에 다시 피의 만찬을 발동합니다.
+                    if (player.classType === 'combat_vamp' && player.passives['feast'] > 0) {
+                        const feastLv = player.passives['feast'];
+                        const feastRadius = 75 + feastLv * 12;
+                        const feastDamage = player.damage * (0.45 + feastLv * 0.12);
+                        let hitCount = 0;
+                        enemies.forEach(e => {
+                            if (e !== enemy && e.hp > 0 && distSq(e.x, e.y, enemy.x, enemy.y) < feastRadius * feastRadius) {
+                                e.hp -= feastDamage;
+                                hitCount++;
+                            }
+                        });
+                        visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '🩸', size: 90 + feastLv * 10, life: 24, maxLife: 24 });
+                        if (hitCount > 0) visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '💢', size: 35 + hitCount * 4, life: 12, maxLife: 12 });
+                    }
+
+                    gainExperience(enemy.exp);
+
+                    if (enemy.type === 'slime' && enemy.sizeLevel === 2) {
+                        let sx1 = enemy.x - 20; let sx2 = enemy.x + 20;
+                        if(checkWallCollision(sx1, enemy.y, 14)) sx1 = enemy.x; if(checkWallCollision(sx2, enemy.y, 14)) sx2 = enemy.x;
+                        enemies.push({ x: sx1, y: enemy.y, radius: 14, emoji: '🦠', hp: enemy.maxHp*0.5, maxHp: enemy.maxHp*0.5, speed: enemy.speed*1.1, damage: enemy.damage*0.5, exp: 5, type: 'slime', sizeLevel: 1 });
+                        enemies.push({ x: sx2, y: enemy.y, radius: 14, emoji: '🦠', hp: enemy.maxHp*0.5, maxHp: enemy.maxHp*0.5, speed: enemy.speed*1.1, damage: enemy.damage*0.5, exp: 5, type: 'slime', sizeLevel: 1 });
+                    }
+
+                    if (enemy.type === 'boss') {
+                        for(let g=0; g<8; g++) items.push({ x: enemy.x + (Math.random()-0.5)*40, y: enemy.y + (Math.random()-0.5)*40, radius: 10, emoji: '🪙', type: 'gold', value: 10 });
+                        // 보스 장비는 일반 80% / 희귀 20%로 결정합니다. 전설 완제품은 직접 드랍하지 않습니다.
+                        const bossLootType = Math.random() < 0.20 ? 'rare_equip' : 'equip';
+                        items.push({ x: enemy.x, y: enemy.y + 20, radius: 15, emoji: '🎁', type: bossLootType });
+                        stageAlert.innerText = bossLootType === 'rare_equip' ? "🐉 보스 처치! 희귀 장비 발견!" : "🐉 보스 처치! 장비 획득!"; stageAlert.style.color = bossLootType === 'rare_equip' ? rarityColors.rare : rarityColors.common; stageAlert.style.opacity = 1; setTimeout(() => stageAlert.style.opacity = 0, 2000);
+                    } else if (enemy.type === 'elite' && Math.random() < getCommonDropChance(currentFloor)) {
+                        items.push({ x: enemy.x, y: enemy.y + 15, radius: 15, emoji: '🎁', type: 'equip' });
+                    } else if (Math.random() < getCommonDropChance(currentFloor)) {
+                        items.push({ x: enemy.x, y: enemy.y, radius: 15, emoji: '🎁', type: 'equip' });
+                    } else if (Math.random() < 0.3) {
+                        items.push({ x: enemy.x, y: enemy.y, radius: 8, emoji: '🪙', type: 'gold', value: 2 + Math.floor(Math.random()*4) });
+                    }
+                    fastRemove(enemies, i);
+                }
+            }
+            if (!isBossAlive && enemies.length === 0) portal.active = true;
+
+            for (let i = items.length - 1; i >= 0; i--) {
+                let item = items[i];
+                if (distSq(player.x, player.y, item.x, item.y) < (player.radius + item.radius + 60)**2) {
+                    let ang = Math.atan2(player.y - item.y, player.x - item.x); item.x += Math.cos(ang) * 9; item.y += Math.sin(ang) * 9;
+                    if (distSq(player.x, player.y, item.x, item.y) < (player.radius + item.radius)**2) {
+                        if (item.type === 'gold') {
+                            player.gold += item.value;
+                            // 획득 즉시 바닥 아이템을 제거해야 매 프레임 중복 획득되는 버그를 막을 수 있습니다.
+                            fastRemove(items, i);
+                        }
+                        else if (item.type === 'potion') {
+                            player.hp = Math.min(player.maxHp, player.hp + 30);
+                            stageAlert.innerText = `🧪 체력 포션 사용 (+30 HP)`;
+                            stageAlert.style.color = "#4da6ff";
+                            stageAlert.style.opacity = 1;
+                            setTimeout(() => stageAlert.style.opacity = 0, 1500);
+                            fastRemove(items, i);
+                        }
+                        else if (item.type === 'rare_equip') {
+                            if(player.bag.length < 8) { const randomEquip=rareEquipment[Math.floor(Math.random()*rareEquipment.length)]; player.bag.push(randomEquip); stageAlert.innerText=`🔵 희귀 장비 획득! ${randomEquip.name}`; stageAlert.style.color=rarityColors.rare; stageAlert.style.opacity=1; setTimeout(()=>stageAlert.style.opacity=0,2200); fastRemove(items,i); }
+                            else { stageAlert.innerText='⚠️ 가방이 꽉 찼습니다! 희귀 장비가 바닥에 남아있습니다.'; stageAlert.style.color='#ff4d4d'; stageAlert.style.opacity=1; setTimeout(()=>stageAlert.style.opacity=0,1500); }
+                        }
+                        else if (item.type === 'equip') {
+                            if(player.bag.length < 8) {
+                                let randomEquip = pickCommonEquipment();
+                                player.bag.push(randomEquip);
+                                stageAlert.innerText = isMobile ? `🎁 장비 획득! [🎒 인벤토리 확인]` : `🎁 장비 획득! [I]를 눌러 확인`;
+                                stageAlert.style.color = "#ffcc00";
+                                stageAlert.style.opacity = 1;
+                                setTimeout(() => stageAlert.style.opacity = 0, 2500);
+                                visualEffects.push({ x: player.x, y: player.y - 20, emoji: '✨', size: 20, life: 10, maxLife: 10 });
+                                fastRemove(items, i);
+                            } else {
+                                stageAlert.innerText = `⚠️ 가방이 꽉 찼습니다! 장비는 바닥에 남아있습니다.`;
+                                stageAlert.style.color = "#ff4d4d";
+                                stageAlert.style.opacity = 1;
+                                setTimeout(() => stageAlert.style.opacity = 0, 1500);
+                                // 인벤토리가 가득 차면 장비 아이템을 제거하지 않습니다.
+                            }
+                        }
+                        else {
+                            visualEffects.push({ x: player.x, y: player.y - 20, emoji: '✨', size: 20, life: 10, maxLife: 10 });
+                            fastRemove(items, i);
+                        }
+                    }
+                }
+            }
+            return needSkillUpdate;
+        }
+
+        function updateInteractables(dt) {
+            for (let i = 0; i < traps.length; i++) {
+                let t = traps[i]; t.timer += dt;
+                if (t.timer > 2000) { t.active = !t.active; t.timer = 0; }
+                if (t.active) {
+                    if (distSq(player.x, player.y, t.x, t.y) < (player.radius + t.radius - 10)**2) { player.hp -= 5 * (dt/1000); }
+                    enemies.forEach(e => { if (distSq(e.x, e.y, t.x, t.y) < (e.radius + t.radius - 10)**2) e.hp -= 30 * (dt/1000); });
+                }
+            }
+            for (let i = aoeZones.length - 1; i >= 0; i--) {
+                let zone = aoeZones[i]; zone.timer -= dt;
+                if (zone.timer <= 0) {
+                    visualEffects.push({ x: zone.x, y: zone.y, emoji: '💥', size: zone.radius * 2, life: 30, maxLife: 30 });
+                    if (distSq(player.x, player.y, zone.x, zone.y) < zone.radius**2) { player.hp -= zone.damage; player.hitFlash = 10; triggerShake(14); }
+                    fastRemove(aoeZones, i);
+                }
+            }
+        }
+
+        function useDash() {
+            if (player.dashCd > 0) return; player.dashCd = player.maxDashCd;
+            let angle = 0;
+            if (isMobile) { angle = (joys.left.active && Math.hypot(joys.left.nx,joys.left.ny)>0.15) ? Math.atan2(joys.left.ny,joys.left.nx) : mobileAimAngle; }
+            else { const wx=screenMouseX+camera.x, wy=screenMouseY+camera.y; angle=Math.atan2(wy-player.y,wx-player.x); }
+            player.dashInvuln = 1000;
+            for(let i=0;i<22;i++){const nx=player.x+Math.cos(angle)*14,ny=player.y+Math.sin(angle)*14;if(!checkWallCollision(nx,ny,player.radius)){player.x=nx;player.y=ny;}else break;}
+            visualEffects.push({x:player.x,y:player.y,emoji:'💨',size:80,life:20,maxLife:20});
+        }
+
+        function useUltimate() {
+            if (player.ultCd > 0) return; player.ultCd = player.maxUltCd; const damage = player.damage * 5;
+            triggerShake(10);
+            let angle = 0;
+            if(isMobile) { angle = getMobileAutoAimAngle(); }
+            else { let worldMouseX = screenMouseX + camera.x; let worldMouseY = screenMouseY + camera.y; angle = Math.atan2(worldMouseY - player.y, worldMouseX - player.x); }
+
+            if (player.classType === 'gunner') {
+                for (let i = 0; i < Math.PI * 2; i += 0.3) projectiles.push({ x: player.x, y: player.y, startX: player.x, startY: player.y, radius: 15, maxRange: 500, vx: Math.cos(i)*12, vy: Math.sin(i)*12, damage: damage, pierce: true, hitTargets: [], emoji: '💨', isBat: false });
+                visualEffects.push({ x: player.x, y: player.y, emoji: '🌀', size: 100, life: 20, maxLife: 20 });
+            } else if (player.classType === 'warrior') {
+                projectiles.push({ x: player.x, y: player.y, startX: player.x, startY: player.y, radius: 80, maxRange: 600, vx: Math.cos(angle)*14, vy: Math.sin(angle)*14, damage: damage*2, pierce: true, hitTargets: [], emoji: '🌊', isBat: false });
+            } else if (player.classType === 'cleric') {
+                player.hp = player.maxHp; visualEffects.push({ x: player.x, y: player.y, emoji: '☀️', size: 300, life: 40, maxLife: 40 });
+                enemies.forEach(e => { if(distSq(e.x, e.y, player.x, player.y) < 62500) e.hp -= damage; });
+            } else if (player.classType === 'combat_vamp') {
+                player.buffs.frenzyTime = 5000; visualEffects.push({ x: player.x, y: player.y, emoji: '🩸', size: 100, life: 30, maxLife: 30 });
+            } else if (player.classType === 'magic_vamp') {
+                for (let i = 0; i < Math.PI * 2; i += (Math.PI/4)) projectiles.push({ x: player.x, y: player.y, startX: player.x, startY: player.y, radius: 25, maxRange: 800, vx: Math.cos(i)*6, vy: Math.sin(i)*6, damage: damage, pierce: true, hitTargets: [], emoji: '🔮', isBat: false });
+            }
+        }
+
+        function shoot(time, angle) {
+            const currentAtkRate = player.buffs.frenzyTime > 0 ? player.atkRate / 3 : player.atkRate;
+            if (time - player.attackCooldown >= currentAtkRate) {
+                let damage = player.damage;
+                const passive = player.passives || {};
+                if (player.classType === 'warrior' && passive.berserk > 0 && player.hp <= player.maxHp * 0.5) {
+                    damage *= 1 + passive.berserk * 0.10;
+                }
+                if (player.classType === 'combat_vamp' && passive.bloodlust > 0) {
+                    const missingHpRatio = 1 - (player.hp / Math.max(1, player.maxHp));
+                    damage *= 1 + missingHpRatio * passive.bloodlust * 0.12;
+                }
+                if (Math.random() < (passive.crit || 0) * 0.1) { damage *= 2; visualEffects.push({ x: player.x, y: player.y - 30, emoji: '💢', size: 30, life: 15, maxLife: 15 }); }
+                if (player.classType === 'warrior' && passive.blade_master > 0) damage *= 1 + passive.blade_master * 0.06;
+                if (player.classType === 'gunner' && passive.sniper > 0) {
+                    let nearestDistance = Infinity;
+                    for (const e of enemies) {
+                        if (e.hp <= 0) continue;
+                        const dx = e.x - player.x, dy = e.y - player.y;
+                        const along = dx * Math.cos(angle) + dy * Math.sin(angle);
+                        if (along < 0) continue;
+                        const side = Math.abs(dx * Math.sin(angle) - dy * Math.cos(angle));
+                        if (side <= e.radius + player.projRadius + 18) nearestDistance = Math.min(nearestDistance, along);
+                    }
+                    if (nearestDistance >= 300 && nearestDistance < Infinity) damage *= 1 + passive.sniper * 0.05;
+                }
+                let pRad = player.projRadius;
+                let pRange = player.range;
+                if (player.classType === 'warrior' && passive.aura > 0) pRad += passive.aura * 3;
+
+                const fire = () => projectiles.push({ x: player.x, y: player.y, startX: player.x, startY: player.y, radius: pRad, maxRange: pRange, vx: Math.cos(angle) * player.projSpeed, vy: Math.sin(angle) * player.projSpeed, damage: damage, pierce: player.pierce, hitTargets: [], emoji: player.projEmoji, isBat: false });
+                fire();
+                player.attackCooldown = time;
+            }
+        }
+
+        // --- 레벨업 3지선다 ---
+        const levelUpStatChoices = [
+            { id:'damage', icon:'⚔️', name:'공격력 강화', desc:'+8%가 아니라 +8 고정 피해. 모든 공격에 적용됩니다.', apply(){ player.upgradeDamage += 8; } },
+            { id:'attackSpeed', icon:'⚡', name:'공격 속도', desc:'공격 간격 -6% (더 빠르게 공격합니다).', apply(){ player.upgradeAtkRate += Math.max(8, classData[player.classType].atkRate * 0.06); } },
+            { id:'maxHp', icon:'❤️', name:'생명력 강화', desc:'최대 HP +35, 즉시 HP도 +35 회복합니다.', apply(){ player.upgradeMaxHp += 35; player.maxHp += 35; player.hp = Math.min(player.maxHp, player.hp + 35); } },
+            { id:'speed', icon:'💨', name:'신속', desc:'이동 속도 +0.25.', apply(){ player.upgradeSpeed += 0.25; } },
+            { id:'projectile', icon:'🎯', name:'탄환 강화', desc:'투사체 속도 +10%, 사거리 +40.', apply(){ player.upgradeProjSpeed += Math.max(0.5, classData[player.classType].projSpeed * 0.10); player.upgradeRange += 40; } },
+        ];
+
+        function getLevelUpChoices() {
+            const pool = levelUpStatChoices.slice();
+            const classPassives = passiveDefs[player.classType] || [];
+            for (const p of classPassives) {
+                const lv = player.passives[p.id] || 0;
+                if (lv < 5) pool.push({
+                    id:'passive:'+p.id, icon:'💎', tier:p.tier || null, name:`${p.name} Lv.${lv + 1}`,
+                    desc:`${p.desc} (현재 Lv.${lv} → Lv.${lv + 1})`,
+                    apply(){ player.passives[p.id] = (player.passives[p.id] || 0) + 1; }
+                });
+            }
+            // Fisher-Yates shuffle 없이 작은 배열에서만 무작위 추출해 불필요한 배열 작업을 줄임
+            const result = [];
+            while (result.length < 3 && pool.length) {
+                const idx = (Math.random() * pool.length) | 0;
+                result.push(pool[idx]);
+                pool[idx] = pool[pool.length - 1];
+                pool.pop();
+            }
+            return result;
+        }
+
+        function showNextLevelUp() {
+            if (pendingLevelUps <= 0) {
+                isLevelUpOpen = false;
+                levelUpScreen.style.display = 'none';
+                isPlaying = true;
+                lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            isLevelUpOpen = true;
+            isPlaying = false;
+            levelUpScreen.style.display = 'flex';
+            const choices = getLevelUpChoices();
+            levelUpChoices.innerHTML = choices.map((c, i) => `
+                <button class="upgrade-card" data-choice="${i}">
+                    <span class="upgrade-key">${i+1}</span>
+                    <div class="upgrade-icon">${c.icon}</div>
+                    <div><div class="upgrade-name">${c.name}${c.tier ? `<span class="upgrade-badge ${c.tier}">${c.tier === 'core' ? '★ 핵심' : '✓ 추천'}</span>` : ''}</div><div class="upgrade-desc">${c.desc}</div></div>
+                </button>`).join('');
+            choices.forEach((choice, i) => {
+                levelUpChoices.children[i].addEventListener('click', () => selectLevelUp(choice), { once:true });
+            });
+        }
+
+        function selectLevelUp(choice) {
+            if (!isLevelUpOpen) return;
+            choice.apply();
+            pendingLevelUps--;
+            calcStats();
+            updateSkillsUI();
+            updateUI();
+            stageAlert.innerText = `⭐ ${choice.name}`;
+            stageAlert.style.color = '#ffcc00';
+            stageAlert.style.opacity = 1;
+            setTimeout(() => stageAlert.style.opacity = 0, 900);
+            showNextLevelUp();
+        }
+
+        function gainExperience(amount) {
+            player.exp += amount;
+            // 초과 EXP를 보존하고 한 번에 여러 레벨이 오르는 경우도 처리
+            while (player.exp >= player.maxExp) {
+                player.exp -= player.maxExp;
+                player.level++;
+                player.maxExp = Math.floor(player.maxExp * 1.55);
+                player.maxHp += 15;
+                player.hp = player.maxHp;
+                pendingLevelUps++;
+            }
+            if (pendingLevelUps > 0 && !isLevelUpOpen) {
+                visualEffects.push({ x: player.x, y: player.y, emoji: '🌟', size: 100, life: 40, maxLife: 40 });
+                showNextLevelUp();
+            }
+        }
+
+        function updateUI() {
+            let hp = Math.floor(player.hp);
+            if(uiState.hp !== hp || uiState.maxHp !== player.maxHp) { hpText.innerText = `${hp} / ${player.maxHp}`; hpBar.style.width = `${(hp / player.maxHp) * 100}%`; uiState.hp = hp; uiState.maxHp = player.maxHp; }
+            if(uiState.exp !== player.exp || uiState.maxExp !== player.maxExp) { expText.innerText = `${player.exp} / ${player.maxExp}`; expBar.style.width = `${(player.exp / player.maxExp) * 100}%`; uiState.exp = player.exp; uiState.maxExp = player.maxExp; }
+            if(uiState.level !== player.level) { levelText.innerText = player.level; uiState.level = player.level; }
+            if(uiState.floor !== currentFloor) { stageText.innerText = `지하 ${currentFloor}층`; uiState.floor = currentFloor; }
+            if(uiState.count !== enemies.length) { enemyCountText.innerText = enemies.length; uiState.count = enemies.length; }
+            if(uiState.gold !== player.gold) { goldText.innerText = player.gold; uiState.gold = player.gold; }
+
+            let dPct = Math.max(0, (player.dashCd / player.maxDashCd) * 100);
+            if(uiState.dash !== dPct) {
+                if(!isMobile) { cdDashOverlay.style.height = `${dPct}%`; if(dPct === 0) slotDash.classList.add('action-ready'); else slotDash.classList.remove('action-ready'); }
+                else { mCdDash.style.height = `${dPct}%`; if(dPct === 0) document.getElementById('m-dash').style.borderColor = '#ffcc00'; else document.getElementById('m-dash').style.borderColor = '#555'; }
+                uiState.dash = dPct;
+            }
+            let uPct = Math.max(0, (player.ultCd / player.maxUltCd) * 100);
+            if(uiState.ult !== uPct) {
+                if(!isMobile) { cdUltOverlay.style.height = `${uPct}%`; if(uPct === 0) slotUlt.classList.add('action-ready'); else slotUlt.classList.remove('action-ready'); }
+                else { mCdUlt.style.height = `${uPct}%`; if(uPct === 0) document.getElementById('m-ult').style.borderColor = '#ffcc00'; else document.getElementById('m-ult').style.borderColor = '#555'; }
+                uiState.ult = uPct;
+            }
+        }
+
+        function updateSkillsUI() {
+            skillsList.innerHTML = '<div style="font-size:9px;color:#999;margin-bottom:3px;">★ 핵심 = 클래스 대표 빌드 · ✓ 추천 = 초보자 추천</div>';
+            for (let id in player.passives) {
+                if (player.passives[id] > 0) {
+                    const s = (passiveDefs[player.classType] || []).find(s => s.id === id);
+                    if (!s) continue;
+                    const badge = s.tier === 'core' ? '<span class="skill-badge core">★ 핵심</span>' : s.tier === 'recommended' ? '<span class="skill-badge recommended">✓ 추천</span>' : '';
+                    skillsList.innerHTML += `<div class="skill-item"><div class="skill-title">${s.name} [Lv.${player.passives[id]}]${badge}</div><div>${s.desc}</div></div>`;
+                }
+            }
+        }
+
+        // [최적화 1] 불필요한 ctx.save/restore 블록을 대폭 줄이고 렌더링 부하 최소화
+        function drawWarrior(x, y, size, alpha = 1.0) {
+            const s = size / 44;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "#151515";
+            ctx.strokeStyle = "#050505";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.roundRect(-14, 4, 28, 17, 6);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = "#111";
+            ctx.beginPath();
+            ctx.arc(0, -6, 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = "#303030";
+            ctx.fillRect(-13, -5, 26, 10);
+
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.ellipse(-5, -1, 2.5, 1.8, -0.15, 0, Math.PI * 2);
+            ctx.ellipse(5, -1, 2.5, 1.8, 0.15, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#111";
+            ctx.beginPath();
+            ctx.arc(-5, -1, 1, 0, Math.PI * 2);
+            ctx.arc(5, -1, 1, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#222";
+            ctx.beginPath();
+            ctx.moveTo(10, -15);
+            ctx.lineTo(19, -11);
+            ctx.lineTo(13, -4);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = "#777";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-11, 7);
+            ctx.lineTo(11, 7);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawTrap(x, y, size, active, alpha = 1.0) {
+            const s = size / 40;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            if (!active) {
+                // 비활성 함정: 이모지 대신 직접 그려서 모바일에서도 깨지지 않게 표시
+                ctx.fillStyle = "#0b0b0d";
+                ctx.strokeStyle = "#666";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.ellipse(0, 4, 17, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = "#333";
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-11, 1); ctx.lineTo(-5, 7);
+                ctx.moveTo(-4, -1); ctx.lineTo(2, 8);
+                ctx.moveTo(4, -1); ctx.lineTo(10, 7);
+                ctx.stroke();
+            } else {
+                // 활성 함정: 바닥판 + 톱니를 직접 렌더링
+                ctx.fillStyle = "#5b5b5f";
+                ctx.strokeStyle = "#bdbdc2";
+                ctx.lineWidth = 2;
+                ctx.fillRect(-15, 1, 30, 9);
+                ctx.strokeRect(-15, 1, 30, 9);
+                ctx.fillStyle = "#d7d7dc";
+                ctx.beginPath();
+                ctx.moveTo(-16, 1); ctx.lineTo(-11, -11); ctx.lineTo(-6, 1);
+                ctx.lineTo(-1, -11); ctx.lineTo(4, 1); ctx.lineTo(9, -11);
+                ctx.lineTo(14, 1); ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = "#8a8a8f";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-11, 6); ctx.lineTo(11, 6);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawCoin(x, y, size, alpha = 1.0) {
+            const s = size / 16;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "#ffd54a";
+            ctx.strokeStyle = "#b8860b";
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.arc(0, 0, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.strokeStyle = "#fff0a6";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = "#a66b00";
+            ctx.font = 'bold 7px Arial, sans-serif';
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("G", 0, 0.5);
+
+            ctx.restore();
+        }
+
+        function drawShadow(x, y, radius, strength = 0.35) {
+            ctx.save();
+            ctx.globalAlpha = strength;
+            ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.ellipse(x, y + radius * 0.72, radius * 0.9, radius * 0.34, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function triggerShake(mag) {
+            shakeMag = Math.max(shakeMag, mag);
+        }
+
+        function drawVignette(originX, originY) {
+            const maxR = Math.max(canvas.width, canvas.height) * 0.68;
+            const grad = ctx.createRadialGradient(originX, originY, maxR * 0.22, originX, originY, maxR);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(0.55, 'rgba(0,0,0,0.30)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.90)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawEmoji(emoji, x, y, size, alpha = 1.0) {
+            if (emoji === "🥷") {
+                drawWarrior(x, y, size, alpha);
+                return;
+            }
+            if (emoji === "🪙") {
+                drawCoin(x, y, size, alpha);
+                return;
+            }
+
+            // [최적화 2] 공통 스타일 설정을 간소화하여 성능 향상
+            ctx.globalAlpha = alpha;
+            ctx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(emoji, x, y);
+            ctx.globalAlpha = 1.0;
+        }
+
+        window.addEventListener('blur', () => {
+    for (const k in keys) keys[k] = false;
+});
+
+function update(dt, time) {
+            if (isLevelUpOpen) return;
+            updatePlayer(dt, time);
+            updateProjectiles(dt, time);
+            let needSkillUpdate = updateEnemies(dt, time);
+            updateInteractables(dt);
+            if (shakeMag > 0) shakeMag = Math.max(0, shakeMag - dt * 0.08);
+            if (player.hitFlash > 0) player.hitFlash--;
+
+            if (visualEffects.length > 80) visualEffects.splice(0, visualEffects.length - 80);
+            if (projectiles.length > 150) projectiles.splice(0, projectiles.length - 150);
+    if (enemyProjectiles.length > 120) enemyProjectiles.splice(0, enemyProjectiles.length - 120);
+
+            updateUI();
+            if (needSkillUpdate) updateSkillsUI();
+            if (player.hp <= 0) { if (isPlaying) gameOver(); return; }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            const zoom = getZoom();
+            if (isMobile) ctx.scale(zoom, zoom);
+            let shakeX = 0, shakeY = 0;
+            if (shakeMag > 0.4) { shakeX = (Math.random() - 0.5) * shakeMag; shakeY = (Math.random() - 0.5) * shakeMag; }
+            ctx.translate(-camera.x + shakeX, -camera.y + shakeY);
+
+            const viewWorldW = canvas.width / zoom;
+            const viewWorldH = canvas.height / zoom;
+            let startCol = Math.max(0, Math.floor(camera.x / tileSize)); let endCol = Math.min(mapCols, Math.floor((camera.x + viewWorldW) / tileSize) + 1);
+            let startRow = Math.max(0, Math.floor(camera.y / tileSize)); let endRow = Math.min(mapRows, Math.floor((camera.y + viewWorldH) / tileSize) + 1);
+
+            for (let r = startRow; r < endRow; r++) {
+                for (let c = startCol; c < endCol; c++) {
+                    let tx = c * tileSize; let ty = r * tileSize;
+                    const noise = (c * 37 + r * 17) % 5;
+                    if (mapGrid[r][c] === 1) {
+                        const shade = 13 + noise * 3;
+                        ctx.fillStyle = `rgb(${shade},${shade},${shade + 3})`;
+                        ctx.fillRect(tx, ty, tileSize, tileSize);
+                        ctx.strokeStyle = '#050505'; ctx.strokeRect(tx, ty, tileSize, tileSize);
+                        ctx.fillStyle = 'rgba(255,255,255,0.035)';
+                        ctx.fillRect(tx, ty, tileSize, 3);
+                    } else {
+                        const shade = 29 + noise * 3;
+                        ctx.fillStyle = `rgb(${shade},${shade + 3},${shade + 7})`;
+                        ctx.fillRect(tx, ty, tileSize, tileSize);
+                        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.strokeRect(tx, ty, tileSize, tileSize);
+                    }
+                }
+            }
+
+            if (portal.active) drawEmoji('🌀', portal.x, portal.y, 80);
+            if (specialRoom && !specialRoom.used) {
+                const specialEmoji = specialRoom.type === 'treasure' ? '💎' : specialRoom.type === 'shrine' ? '⛲' : '🩸';
+                drawEmoji(specialEmoji, specialRoom.x, specialRoom.y, 70);
+                ctx.fillStyle = 'rgba(255,255,255,0.82)';
+                ctx.font = "12px 'Gowun Dodum'";
+                ctx.textAlign = 'center';
+                ctx.fillText('특수 방', specialRoom.x, specialRoom.y - 48);
+            }
+
+            altars.forEach(a => { drawEmoji(a.used ? '🗿' : '⛩️', a.x, a.y, 50); if(!a.used) { ctx.fillStyle = "#ff4d4d"; ctx.font = "12px 'Gowun Dodum'"; ctx.fillText("최대체력-20 / 공격력+15", a.x, a.y - 35); } });
+            traps.forEach(t => drawTrap(t.x, t.y, 40, t.active));
+            breakables.forEach(b => drawEmoji(b.emoji, b.x, b.y, b.radius * 2));
+
+            aoeZones.forEach(z => { ctx.fillStyle = 'rgba(255, 0, 0, 0.2)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI*2); ctx.fill(); let progress = Math.max(0, 1 - (z.timer / z.maxTimer)); ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.radius * progress, 0, Math.PI*2); ctx.fill(); });
+
+            stageProps.forEach(prop => drawEmoji(prop.emoji, prop.x, prop.y, prop.size, 0.3));
+            items.forEach(item => {
+                if (item.type === 'equip' || item.type === 'rare_equip') {
+                    ctx.save();
+                    ctx.shadowColor = item.type === 'rare_equip' ? 'rgba(76,140,255,0.75)' : 'rgba(255,215,0,0.65)';
+                    ctx.shadowBlur = 16;
+                    drawEmoji(item.emoji, item.x, item.y, item.radius * 2);
+                    ctx.restore();
+                } else {
+                    drawEmoji(item.emoji, item.x, item.y, item.radius * 2);
+                }
+            });
+            enemies.forEach(e => {
+                drawShadow(e.x, e.y, e.radius);
+                if (e.hitFlash > 0) {
+                    ctx.save();
+                    ctx.globalAlpha = Math.min(0.6, (e.hitFlash / 6) * 0.6);
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, e.radius * 1.15, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+                drawEmoji(e.emoji, e.x, e.y, e.radius * 2);
+                if (e.type === 'elite') { ctx.strokeStyle = 'rgba(255,140,0,0.75)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 6, 0, Math.PI*2); ctx.stroke(); }
+                else if (e.type === 'boss') { ctx.strokeStyle = 'rgba(255,40,40,0.55)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 10, 0, Math.PI*2); ctx.stroke(); }
+                const barW = 30, barX = e.x - barW/2, barY = e.y - e.radius - 12;
+                const pct = Math.max(0, e.hp / e.maxHp);
+                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.roundRect(barX - 1, barY - 1, barW + 2, 6, 3); ctx.fill();
+                ctx.fillStyle = '#3a0d0d'; ctx.beginPath(); ctx.roundRect(barX, barY, barW, 4, 2); ctx.fill();
+                const hpColor = pct > 0.5 ? '#4CAF50' : pct > 0.25 ? '#ffcc00' : '#ff3333';
+                ctx.fillStyle = hpColor; ctx.beginPath(); ctx.roundRect(barX, barY, barW * pct, 4, 2); ctx.fill();
+            });
+
+            projectiles.forEach(p => drawEmoji(p.emoji, p.x, p.y, p.radius * 2));
+            enemyProjectiles.forEach(p => drawEmoji(p.emoji, p.x, p.y, p.radius * 2));
+
+            let angle = 0;
+            if(isMobile) { angle = getMobileAutoAimAngle(); }
+            else { let worldMouseX = screenMouseX + camera.x; let worldMouseY = screenMouseY + camera.y; angle = Math.atan2(worldMouseY - player.y, worldMouseX - player.x); }
+
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(angle);
+            drawEmoji(player.weapon, 32, 0, 24);
+            ctx.restore();
+
+            // 현재 공격 방향을 희미하게 표시해 모바일 조준 상태를 즉시 알 수 있게 합니다.
+            if (isMobile) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(player.x + Math.cos(mobileAimAngle) * 55, player.y + Math.sin(mobileAimAngle) * 55);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            drawShadow(player.x, player.y, player.radius, 0.4);
+            if (player.hitFlash > 0) {
+                ctx.save();
+                ctx.globalAlpha = Math.min(0.5, (player.hitFlash / 8) * 0.5);
+                ctx.fillStyle = '#ff3030';
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.radius * 1.3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            drawEmoji(player.emoji, player.x, player.y, player.radius * 2.2);
+
+            if (player.buffs.frenzyTime > 0) { ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(player.x, player.y, player.radius + 10, 0, Math.PI*2); ctx.stroke(); }
+            if (player.passives['mana_shield'] > 0) { ctx.strokeStyle = 'rgba(200, 0, 200, 0.4)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(player.x, player.y, player.radius + 15, 0, Math.PI*2); ctx.stroke(); }
+
+            for (let i = visualEffects.length - 1; i >= 0; i--) {
+                let eff = visualEffects[i]; let alpha = Math.max(0, eff.life / eff.maxLife);
+                drawEmoji(eff.emoji, eff.x, eff.y, eff.size * (1 + (eff.maxLife - eff.life)*0.02), alpha);
+                eff.life--; if(eff.life <= 0) fastRemove(visualEffects, i);
+            }
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(player.x + Math.cos(angle)*45, player.y + Math.sin(angle)*45); ctx.lineTo(player.x + Math.cos(angle)*70, player.y + Math.sin(angle)*70); ctx.stroke();
+            ctx.restore();
+
+            const playerScreenX = (player.x - camera.x) * zoom + shakeX * zoom;
+            const playerScreenY = (player.y - camera.y) * zoom + shakeY * zoom;
+            drawVignette(playerScreenX, playerScreenY);
+
+            if (isMobile) {
+                ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+                if (joys.left.active) { ctx.beginPath(); ctx.arc(joys.left.cx, joys.left.cy, 50, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = "rgba(255, 255, 255, 0.4)"; ctx.beginPath(); ctx.arc(joys.left.cx + joys.left.nx*30, joys.left.cy + joys.left.ny*30, 25, 0, Math.PI*2); ctx.fill(); }
+                ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+
+            }
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (isPlaying) {
+                    isPlaying = false;
+                    cancelAnimationFrame(animationId);
+                }
+            } else if (player.classType && !isInvOpen && shopScreen.style.display === "none" && gameOverScreen.style.display === "none") {
+                isPlaying = true;
+                lastTime = performance.now();
+                animationId = requestAnimationFrame(gameLoop);
+            }
+        });
+
+        function gameLoop(time) {
+            if (!isPlaying) return;
+            if (lastTime === 0) lastTime = time;
+            const dt = Math.min(50, Math.max(0, time - lastTime)); update(dt, time); draw(); lastTime = time;
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            activeEvent = null; eventScreen.style.display = "none";
+            isPlaying = false; cancelAnimationFrame(animationId);
+            hud.style.display = "none"; if(!isMobile) actionBar.style.display = "none"; else { document.getElementById("mobile-buttons").style.display = "none"; document.getElementById("m-inv-btn").style.display = "none"; }
+            gameOverScreen.style.display = "flex"; document.getElementById("final-score").innerText = `도달한 층: 지하 ${currentFloor}층 | 레벨: ${player.level}`;
+        }
+    </script>
+</body>
+</html>
