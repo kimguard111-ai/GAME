@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Eternal Night - Optimized Core</title>
+    <title>Eternal Night v37 - Floor Identity</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Oswald:wght@500;700&display=swap');
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; min-height: 100dvh; background-color: #000; color: #e0e0e0; font-family: 'Gowun Dodum', sans-serif; overflow: hidden; user-select: none; touch-action: none; }
@@ -37,7 +37,7 @@
 
         .skill-title { color: #ffcc00; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
         .stage-info { text-align: right; font-size: 20px; font-family: 'Oswald', sans-serif; text-shadow: 2px 2px 5px #000; }
-        #stage-alert { position: absolute; top: 25%; font-family: 'Oswald', sans-serif; font-size: 38px; color: #fff; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 6; text-align: center; text-shadow: 0 0 20px rgba(255,204,0,0.8); width: 100%; padding: 0 20px; box-sizing: border-box; }
+        #stage-alert { position: absolute; top: 25%; font-family: 'Oswald', sans-serif; font-size: 38px; color: #fff; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 6; text-align: center; text-shadow: 0 0 20px rgba(255,204,0,0.8); width: 100%; padding: 0 20px; box-sizing: border-box; white-space: pre-line; line-height: 1.25; }
         #action-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 5; }
         .action-slot { width: 60px; height: 60px; background: rgba(10, 10, 10, 0.9); border: 2px solid #444; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: 'Oswald', sans-serif; position: relative; overflow: hidden; }
         .action-key { font-size: 20px; font-weight: bold; color: #fff; z-index: 2; }
@@ -320,10 +320,11 @@
         let specialRoom = null;
 
         let enemies = [], projectiles = [], enemyProjectiles = [], aoeZones = [], items = [], visualEffects = [], stageProps = [], traps = [], breakables = [], altars = [];
+        let floorRule = { id: 'normal', name: '일반 던전', desc: '특수 규칙 없음', speedMult: 1, damageMult: 1, dropBonus: 0, hazard: false };
+        let floorHazardTimer = 0;
         const joys = { left: { active: false, cx: 0, cy: 0, nx: 0, ny: 0, id: null }, right: { active: false, cx: 0, cy: 0, nx: 0, ny: 0, id: null } };
         // 모바일: 오른쪽 조이스틱은 '누르고 있는 동안만 공격'이 아니라 마지막 조준 방향을 유지합니다.
         let mobileAimAngle = 0;
-        let shakeMag = 0;
         const uiState = { hp: -1, maxHp: -1, exp: -1, maxExp: -1, level: -1, floor: -1, count: -1, dash: -1, ult: -1, gold: -1 };
 
         resizeCanvas();
@@ -418,7 +419,7 @@
             {result:'rac1',materials:['ac1','ac3','a1']},{result:'rac2',materials:['ac2','ac4','a4']},
             {result:'lw1',materials:['rw1','rw3','rac2']},{result:'lw2',materials:['rw2','rw1','ra2']},{result:'la1',materials:['ra1','rw3','rac1']},{result:'la2',materials:['ra2','ra3','rw2']},{result:'lac1',materials:['rac1','rac2','rw1']}
         ];
-        const player = { x: 0, y: 0, radius: 20, classType: '', level: 1, exp: 0, maxExp: 120, passives: {}, passiveCounters: {}, upgradeDamage: 0, upgradeAtkRate: 0, upgradeMaxHp: 0, upgradeSpeed: 0, upgradeProjSpeed: 0, upgradeRange: 0, dashCd: 0, maxDashCd: 20000, ultCd: 0, maxUltCd: 15000, buffs: { frenzyTime: 0 }, gold: 0, weaponLv: 1, armorLv: 1, bag: [], equip: { weapon: null, armor: null, accessory: null }, killHeal: 0, dashInvuln: 0, hitFlash: 0 };
+        const player = { x: 0, y: 0, radius: 20, classType: '', level: 1, exp: 0, maxExp: 120, passives: {}, passiveCounters: {}, upgradeDamage: 0, upgradeAtkRate: 0, upgradeMaxHp: 0, upgradeSpeed: 0, upgradeProjSpeed: 0, upgradeRange: 0, dashCd: 0, maxDashCd: 20000, ultCd: 0, maxUltCd: 15000, buffs: { frenzyTime: 0 }, gold: 0, weaponLv: 1, armorLv: 1, bag: [], equip: { weapon: null, armor: null, accessory: null }, killHeal: 0, dashInvuln: 0 };
         let shopPrices = { potion: 20, weapon: 50, armor: 50 };
 
         window.addEventListener("keydown", e => { if (e.code === "Space") e.preventDefault(); if (isLevelUpOpen && ["Digit1","Digit2","Digit3"].includes(e.code)) { const btn = levelUpChoices.children[Number(e.code.slice(-1))-1]; if (btn) btn.click(); return; } keys[e.code] = true; if (e.code === "KeyI" && player.classType !== '' && player.hp > 0 && shopScreen.style.display === "none") toggleInventory(); });
@@ -677,11 +678,30 @@ function startGame(type) {
             updateSkillsUI(); calcStats(); startFloor(1); isPlaying = true; requestAnimationFrame(gameLoop);
         }
 
+        function getFloorRule(floor) {
+            if (floor % 5 === 0) {
+                return { id: 'boss', name: '심연의 보스전', desc: '심연의 용이 기다리고 있습니다.', speedMult: 1, damageMult: 1, dropBonus: 0, hazard: false };
+            }
+            const cycle = (floor - 1) % 5;
+            if (cycle === 1) {
+                return { id: 'rush', name: '질풍의 밤', desc: '일반 적 이동속도 +12%', speedMult: 1.12, damageMult: 1, dropBonus: 0, hazard: false };
+            }
+            if (cycle === 2) {
+                return { id: 'curse', name: '저주의 밤', desc: '8초마다 저주 폭발이 발생합니다.', speedMult: 1, damageMult: 1, dropBonus: 0, hazard: true };
+            }
+            if (cycle === 3) {
+                return { id: 'treasure', name: '황금의 밤', desc: '일반 장비 드랍률 +1.5%p', speedMult: 1, damageMult: 1, dropBonus: 0.015, hazard: false };
+            }
+            return { id: 'abyss', name: '심연의 밤', desc: '일반 적 접촉 피해 +12%, 플레이어 공격력 +8%', speedMult: 1, damageMult: 1.12, dropBonus: 0, hazard: false };
+        }
+
         function getFloorCombatConfig(floor) {
             // 층별 전투량을 고정된 기준으로 잡고, 방 배치만 소폭 랜덤하게 합니다.
             // 분열 슬라임/소환사 추가 소환은 별도 변수가므로 실제 남은 마물 수는 목표치보다 늘어날 수 있습니다.
             return {
                 targetEnemies: Math.min(45, 18 + (floor - 1) * 3),
+                // 10층부터 고등급 몬스터가 등장합니다. 등장 빈도는 천천히 증가합니다.
+                highGradeChance: floor >= 10 ? Math.min(0.10, 0.05 + Math.floor((floor - 10) / 5) * 0.01) : 0,
                 eliteChance: Math.min(0.20, 0.08 + (floor - 1) * 0.015),
                 summonerChance: 0.10,
                 slimeChance: 0.15,
@@ -711,6 +731,8 @@ function startGame(type) {
 
         function startFloor(floor) {
             currentFloor = floor; enemies = []; projectiles = []; enemyProjectiles = []; aoeZones = []; items = []; visualEffects = []; stageProps = []; traps = []; breakables = []; altars = []; portal.active = false;
+            floorRule = getFloorRule(floor);
+            floorHazardTimer = 0;
             const combatConfig = getFloorCombatConfig(floor);
             const isBossFloor = floor % 5 === 0;
             let rooms = generateDungeon();
@@ -736,7 +758,6 @@ function startGame(type) {
             for(let i=1; i<rooms.length; i++) {
                 let r = rooms[i]; let rx = r.x * tileSize; let ry = r.y * tileSize;
                 if(checkWallCollision(rx, ry, 20)) continue;
-                if (i === specialRoomIndex) continue; // 특수 이벤트 방(보물/샘/제단)은 일반 몬스터·함정·상자를 두지 않습니다.
 
                 if (!altarSpawned && Math.random() < 0.3) { altars.push({ x: rx, y: ry, radius: 25, emoji: '⛩️', used: false }); altarSpawned = true; }
                 let boxCount = Math.random() < 0.4 ? 1 : 0;
@@ -744,19 +765,32 @@ function startGame(type) {
                 let trapCount = Math.random() < 0.3 ? 1 : 0;
                 for(let t=0; t<trapCount; t++) { let tx = (r.rx + 1 + Math.random() * (r.rw - 2)) * tileSize; let ty = (r.ry + 1 + Math.random() * (r.rh - 2)) * tileSize; if(!checkWallCollision(tx, ty, 25)) traps.push({ x: tx, y: ty, radius: 25, active: false, timer: Math.random() * 2000 }); }
 
-                if (i === rooms.length - 1 && isBossFloor) { enemies.push({ x: rx, y: ry, radius: 45, emoji: '🐉', hp: 800 + floor*200, maxHp: 800 + floor*200, speed: 0.9, damage: 45, exp: 300, type: 'boss', phase2: false, lastAoE: 0, lastBullet: 0 }); }
+                if (i === rooms.length - 1 && isBossFloor) { enemies.push({
+                    x: rx, y: ry, radius: 62, emoji: '🐉',
+                    hp: 1400 + floor*260, maxHp: 1400 + floor*260,
+                    speed: 0.82, damage: 55 + floor*2, exp: 500,
+                    type: 'boss', bossName: '심연의 용', phase2: false,
+                    lastAoE: 0, lastBullet: 0, lastRoar: 0
+                }); }
                 else {
                     const count = roomEnemyCounts[normalRoomIndex++] || 1;
                     for(let j=0; j<count; j++) {
                         let ex = rx + (Math.random()-0.5)*tileSize*3; let ey = ry + (Math.random()-0.5)*tileSize*3;
                         if(checkWallCollision(ex, ey, 18)) { ex = rx; ey = ry; }
                         let rand = Math.random();
-                        const eliteCut = combatConfig.eliteChance;
+                        const highGradeCut = combatConfig.highGradeChance;
+                        const eliteCut = highGradeCut + combatConfig.eliteChance;
                         const summonerCut = eliteCut + combatConfig.summonerChance;
                         const slimeCut = summonerCut + combatConfig.slimeChance;
                         const rangedCut = slimeCut + combatConfig.rangedChance;
                         const dashCut = rangedCut + combatConfig.dashChance;
-                        if (rand < eliteCut) enemies.push({ x: ex, y: ey, radius: 25, emoji: '👹', hp: 200 + floor*50, maxHp: 200 + floor*50, speed: 1.0, damage: 25, exp: 60, type: 'elite' });
+                        if (rand < highGradeCut) enemies.push({
+                            x: ex, y: ey, radius: 38, emoji: '🗿',
+                            hp: 700 + floor*90, maxHp: 700 + floor*90,
+                            speed: 0.55, damage: 45 + floor*2, exp: 120,
+                            type: 'golem', lastSlam: 0, enraged: false
+                        });
+                        else if (rand < eliteCut) enemies.push({ x: ex, y: ey, radius: 25, emoji: '👹', hp: 200 + floor*50, maxHp: 200 + floor*50, speed: 1.0, damage: 25, exp: 60, type: 'elite' });
                         else if (rand < summonerCut) enemies.push({ x: ex, y: ey, radius: 20, emoji: '🧙‍♀️', hp: 80 + floor*20, maxHp: 80 + floor*20, speed: 0.72, damage: 10, exp: 30, type: 'summoner', lastSummon: 0 });
                         else if (rand < slimeCut) enemies.push({ x: ex, y: ey, radius: 22, emoji: '🦠', hp: 70 + floor*15, maxHp: 70 + floor*15, speed: 0.9, damage: 15, exp: 15, type: 'slime', sizeLevel: 2 });
                         else if (rand < rangedCut) enemies.push({ x: ex, y: ey, radius: 18, emoji: '🏹', hp: 50 + floor*15, maxHp: 50 + floor*15, speed: 0.63, damage: 20 + floor*2, exp: 20, type: 'ranged', lastShot: 0 });
@@ -768,7 +802,7 @@ function startGame(type) {
 
             const propsEmoji = ['🪦', '🥀', '🕸️', '🦴'];
             for(let i=0; i < 15 + floor*2; i++) { let px = Math.random() * (mapCols * tileSize); let py = Math.random() * (mapRows * tileSize); if(!checkWallCollision(px, py, 10)) stageProps.push({ x: px, y: py, emoji: propsEmoji[Math.floor(Math.random() * propsEmoji.length)], size: 20 + Math.random() * 20 }); }
-            stageAlert.innerText = `B${floor} FLOOR`; stageAlert.style.color = "#fff"; stageAlert.style.opacity = 1; setTimeout(() => stageAlert.style.opacity = 0, 2000);
+            stageAlert.innerText = `B${floor} FLOOR\n${floorRule.name}\n${floorRule.desc}`; stageAlert.style.color = floorRule.id === 'treasure' ? '#ffd54a' : floorRule.id === 'curse' ? '#c77dff' : floorRule.id === 'abyss' ? '#ff5a5a' : floorRule.id === 'rush' ? '#7dd3fc' : '#fff'; stageAlert.style.opacity = 1; setTimeout(() => stageAlert.style.opacity = 0, 2400);
             lastTime = performance.now();
         }
 
@@ -778,8 +812,9 @@ function startGame(type) {
                 if (e.hp <= 0) continue;
                 const d2 = distSq(player.x, player.y, e.x, e.y);
                 const bossBonus = e.type === 'boss' ? -100000000 : 0;
+                const highGradeBonus = e.type === 'golem' ? -50000 : 0;
                 const eliteBonus = e.type === 'elite' ? -25000 : 0;
-                const score = d2 + bossBonus + eliteBonus;
+                const score = d2 + bossBonus + highGradeBonus + eliteBonus;
                 if (score < bestScore) { bestScore = score; target = e; }
             }
             if (target) mobileAimAngle = Math.atan2(target.y - player.y, target.x - player.x);
@@ -790,7 +825,7 @@ function startGame(type) {
             if (player.dashInvuln > 0) player.dashInvuln = Math.max(0, player.dashInvuln - dt);
             if (player.dashCd > 0) player.dashCd -= dt; if (player.ultCd > 0) player.ultCd -= dt; if (player.buffs.frenzyTime > 0) player.buffs.frenzyTime -= dt;
 
-            let dx = 0, dy = 0; let spd = player.speed;
+            let dx = 0, dy = 0; let spd = player.speed + ((player.passives['shadow'] || 0) * 0.4);
             if (player.buffs.frenzyTime > 0) spd *= 1.5;
 
             if (isMobile) { if (joys.left.active) { dx = joys.left.nx; dy = joys.left.ny; } }
@@ -840,11 +875,7 @@ function startGame(type) {
         function updateProjectiles(dt, time) {
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 let p = projectiles[i];
-                if (p.isBat && enemies.length > 0) {
-                    let target = null, bestD = Infinity;
-                    for (const e of enemies) { const d = distSq(p.x, p.y, e.x, e.y); if (d < bestD) { bestD = d; target = e; } }
-                    let ang = Math.atan2(target.y - p.y, target.x - p.x); p.vx = Math.cos(ang) * 8; p.vy = Math.sin(ang) * 8;
-                }
+                if (p.isBat && enemies.length > 0) { let target = enemies[0]; let ang = Math.atan2(target.y - p.y, target.x - p.x); p.vx = Math.cos(ang) * 8; p.vy = Math.sin(ang) * 8; }
                 p.x += p.vx; p.y += p.vy;
 
                 if (checkWallCollision(p.x, p.y, p.radius) || distSq(p.x, p.y, p.startX, p.startY) > p.maxRange**2) { fastRemove(projectiles, i); continue; }
@@ -855,7 +886,6 @@ function startGame(type) {
                     if (p.hitTargets.includes(enemy)) continue;
                     if (distSq(p.x, p.y, enemy.x, enemy.y) < (p.radius + enemy.radius)**2) {
                         enemy.hp -= p.damage;
-                        enemy.hitFlash = 6;
                         if (!p.isProc) triggerPassives(p, enemy, time);
                         if (p.pierce) p.hitTargets.push(enemy); else { fastRemove(projectiles, i); pRemoved = true; break; }
                     }
@@ -879,7 +909,7 @@ function startGame(type) {
             for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
                 let p = enemyProjectiles[i]; p.x += p.vx; p.y += p.vy;
                 if (checkWallCollision(p.x, p.y, p.radius) || distSq(p.x, p.y, p.startX, p.startY) > p.maxRange**2) { fastRemove(enemyProjectiles, i); continue; }
-                if (distSq(p.x, p.y, player.x, player.y) < (p.radius + player.radius)**2) { if (player.dashInvuln <= 0) { player.hp -= p.damage; player.hitFlash = 8; } fastRemove(enemyProjectiles, i); }
+                if (distSq(p.x, p.y, player.x, player.y) < (p.radius + player.radius)**2) { if (player.dashInvuln <= 0) player.hp -= p.damage; fastRemove(enemyProjectiles, i); }
             }
         }
 
@@ -962,7 +992,6 @@ function startGame(type) {
             let isBossAlive = false; let needSkillUpdate = false;
             for (let i = enemies.length - 1; i >= 0; i--) {
                 let enemy = enemies[i];
-                if (enemy.hitFlash > 0) enemy.hitFlash--;
                 if(enemy.type === 'boss') isBossAlive = true;
 
                 let distSqToPlayer = distSq(player.x, player.y, enemy.x, enemy.y);
@@ -980,6 +1009,34 @@ function startGame(type) {
                         enemies.push({ x: sx, y: sy, radius: 18, emoji: '🧟', hp: 50 + currentFloor*15, maxHp: 50 + currentFloor*15, speed: 1.08, damage: 12 + currentFloor, exp: 5, type: 'normal' });
                         visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '✨', size: 30, life: 15, maxLife: 15 }); enemy.lastSummon = time;
                     }
+                } else if (enemy.type === 'golem') {
+                    // 고대 골렘: 느리지만 강력한 지면 강타. HP 40% 이하에서는 격노합니다.
+                    if (!enemy.enraged && enemy.hp <= enemy.maxHp * 0.4) {
+                        enemy.enraged = true;
+                        enemy.speed *= 1.35;
+                        enemy.damage *= 1.15;
+                        visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '💢', size: 90, life: 35, maxLife: 35 });
+                        stageAlert.innerText = "🗿 골렘 격노!";
+                        stageAlert.style.color = "#ff8a00";
+                        stageAlert.style.opacity = 1;
+                        setTimeout(() => stageAlert.style.opacity = 0, 1000);
+                    }
+                    if (distSqToPlayer > 90000) {
+                        exDx = Math.cos(angle) * enemy.speed;
+                        exDy = Math.sin(angle) * enemy.speed;
+                    } else {
+                        exDx = Math.cos(angle) * enemy.speed;
+                        exDy = Math.sin(angle) * enemy.speed;
+                    }
+                    if (distSqToPlayer < 78400 && time - (enemy.lastSlam || 0) > 5500) {
+                        aoeZones.push({
+                            x: player.x, y: player.y, radius: enemy.enraged ? 115 : 95,
+                            timer: 1100, maxTimer: 1100,
+                            damage: enemy.damage * (enemy.enraged ? 1.9 : 1.6)
+                        });
+                        visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '💥', size: 80, life: 25, maxLife: 25 });
+                        enemy.lastSlam = time;
+                    }
                 } else if (enemy.type === 'ranged') {
                     if (distSqToPlayer > 90000) { exDx = Math.cos(angle) * enemy.speed; exDy = Math.sin(angle) * enemy.speed; }
                     if (distSqToPlayer < 360000 && time - enemy.lastShot > 3500) { enemyProjectiles.push({ x: enemy.x, y: enemy.y, startX: enemy.x, startY: enemy.y, radius: 10, maxRange: 600, vx: Math.cos(angle)*4.5, vy: Math.sin(angle)*4.5, damage: enemy.damage, emoji: '🔥' }); enemy.lastShot = time; }
@@ -988,31 +1045,57 @@ function startGame(type) {
                     if (enemy.isDashing) { exDx = Math.cos(enemy.dashAngle) * (enemy.speed * 3.2); exDy = Math.sin(enemy.dashAngle) * (enemy.speed * 3.2); visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '💨', size: 15, life: 5, maxLife: 5 }); if (time - enemy.dashTime > 400) { enemy.isDashing = false; enemy.lastDash = time; } } else { exDx = Math.cos(angle) * enemy.speed; exDy = Math.sin(angle) * enemy.speed; }
                 } else if (enemy.type === 'boss') {
                     if (!enemy.phase2 && enemy.hp < enemy.maxHp * 0.5) {
-                        enemy.phase2 = true; enemy.speed *= 1.3; visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '💢', size: 100, life: 30, maxLife: 30 });
-                        triggerShake(24);
+                        enemy.phase2 = true; enemy.speed *= 1.45; visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '💢', size: 100, life: 30, maxLife: 30 });
                         stageAlert.innerText = "BOSS PHASE 2!"; stageAlert.style.color = "#ff0000"; stageAlert.style.opacity = 1; setTimeout(() => stageAlert.style.opacity = 0, 1500);
                     }
                     exDx = Math.cos(angle) * enemy.speed; exDy = Math.sin(angle) * enemy.speed;
-                    if (distSqToPlayer < 640000 && time - enemy.lastAoE > 7000) { aoeZones.push({ x: player.x, y: player.y, radius: 150, timer: 1500, maxTimer: 1500, damage: enemy.damage * 1.5 }); enemy.lastAoE = time; }
-                    if (enemy.phase2 && time - (enemy.lastBullet||0) > 4000) { for(let i=0; i<Math.PI*2; i+=Math.PI/4) enemyProjectiles.push({ x: enemy.x, y: enemy.y, startX: enemy.x, startY: enemy.y, radius: 12, maxRange: 600, vx: Math.cos(i)*6, vy: Math.sin(i)*6, damage: enemy.damage, emoji: '🔥' }); enemy.lastBullet = time; }
+                    if (distSqToPlayer < 640000 && time - enemy.lastAoE > (enemy.phase2 ? 4500 : 6000)) {
+                        aoeZones.push({
+                            x: player.x, y: player.y,
+                            radius: enemy.phase2 ? 190 : 165,
+                            timer: enemy.phase2 ? 1300 : 1500,
+                            maxTimer: enemy.phase2 ? 1300 : 1500,
+                            damage: enemy.damage * (enemy.phase2 ? 1.9 : 1.55)
+                        });
+                        visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '🔥', size: 105, life: 28, maxLife: 28 });
+                        enemy.lastAoE = time;
+                    }
+                    if (time - (enemy.lastRoar||0) > (enemy.phase2 ? 9000 : 12000)) {
+                        visualEffects.push({ x: enemy.x, y: enemy.y, emoji: '💥', size: 130, life: 35, maxLife: 35 });
+                        stageAlert.innerText = enemy.phase2 ? "🐉 심연의 용이 포효한다!" : "🐉 용의 포효!";
+                        stageAlert.style.color = "#ff3b3b";
+                        stageAlert.style.opacity = 1;
+                        setTimeout(() => stageAlert.style.opacity = 0, 1000);
+                        enemy.lastRoar = time;
+                    }
+                    if (enemy.phase2 && time - (enemy.lastBullet||0) > 2800) {
+                        for(let i=0; i<Math.PI*2; i+=Math.PI/6) enemyProjectiles.push({
+                            x: enemy.x, y: enemy.y, startX: enemy.x, startY: enemy.y,
+                            radius: 12, maxRange: 650,
+                            vx: Math.cos(i)*6.5, vy: Math.sin(i)*6.5,
+                            damage: enemy.damage * 1.15, emoji: '🔥'
+                        });
+                        enemy.lastBullet = time;
+                    }
                 } else { exDx = Math.cos(angle) * enemy.speed; exDy = Math.sin(angle) * enemy.speed; }
 
+                if (enemy.type !== 'boss' && floorRule.speedMult !== 1) { exDx *= floorRule.speedMult; exDy *= floorRule.speedMult; }
                 if (!checkWallCollision(enemy.x + exDx, enemy.y, enemy.radius)) enemy.x += exDx;
                 if (!checkWallCollision(enemy.x, enemy.y + exDy, enemy.radius)) enemy.y += exDy;
 
                 if (distSqToPlayer < (player.radius + enemy.radius)**2) {
                     if (Math.random() > ((player.passives['dodge'] || 0) * 0.05 + (player.passives['shadow'] || 0) * 0.04)) {
-                        let incomingDmg = enemy.damage * (dt / 1000);
+                        let incomingDmg = enemy.damage * (dt / 1000) * (enemy.type === 'boss' ? 1 : floorRule.damageMult);
                     if (player.dashInvuln > 0) incomingDmg = 0;
                         if (player.passives['mana_shield'] > 0) incomingDmg *= (1 - (player.passives['mana_shield'] * 0.08));
                         if (player.passives['holyguard'] > 0) incomingDmg *= (1 - (player.passives['holyguard'] * 0.04));
                         if (player.passives['toughness'] > 0) incomingDmg = Math.max(0, incomingDmg - (player.passives['toughness'] * 2));
                         player.hp -= incomingDmg;
-                        if (incomingDmg > 0.05) player.hitFlash = 6;
                     }
                 }
 
                 if (enemy.hp <= 0) {
+                    const floorDropChance = Math.min(0.08, getCommonDropChance(currentFloor) + floorRule.dropBonus);
                     if (player.classType === 'combat_vamp') player.hp = Math.min(player.maxHp, player.hp + 2 + (player.passives['vampirism'] || 0));
                     if (player.passives['regeneration'] > 0) player.hp = Math.min(player.maxHp, player.hp + player.passives['regeneration'] * 4);
                     if (player.killHeal > 0) player.hp = Math.min(player.maxHp, player.hp + player.killHeal);
@@ -1058,9 +1141,19 @@ function startGame(type) {
                         const bossLootType = Math.random() < 0.20 ? 'rare_equip' : 'equip';
                         items.push({ x: enemy.x, y: enemy.y + 20, radius: 15, emoji: '🎁', type: bossLootType });
                         stageAlert.innerText = bossLootType === 'rare_equip' ? "🐉 보스 처치! 희귀 장비 발견!" : "🐉 보스 처치! 장비 획득!"; stageAlert.style.color = bossLootType === 'rare_equip' ? rarityColors.rare : rarityColors.common; stageAlert.style.opacity = 1; setTimeout(() => stageAlert.style.opacity = 0, 2000);
-                    } else if (enemy.type === 'elite' && Math.random() < getCommonDropChance(currentFloor)) {
+                    } else if (enemy.type === 'golem') {
+                        // 고등급 몬스터는 일반 몬스터보다 확실한 처치 보상을 줍니다.
+                        for(let g=0; g<3; g++) items.push({
+                            x: enemy.x + (Math.random()-0.5)*35,
+                            y: enemy.y + (Math.random()-0.5)*35,
+                            radius: 10, emoji: '🪙', type: 'gold', value: 5 + Math.floor(Math.random()*4)
+                        });
+                        if (Math.random() < floorDropChance) {
+                            items.push({ x: enemy.x, y: enemy.y + 15, radius: 15, emoji: '🎁', type: 'equip' });
+                        }
+                    } else if (enemy.type === 'elite' && Math.random() < floorDropChance) {
                         items.push({ x: enemy.x, y: enemy.y + 15, radius: 15, emoji: '🎁', type: 'equip' });
-                    } else if (Math.random() < getCommonDropChance(currentFloor)) {
+                    } else if (Math.random() < floorDropChance) {
                         items.push({ x: enemy.x, y: enemy.y, radius: 15, emoji: '🎁', type: 'equip' });
                     } else if (Math.random() < 0.3) {
                         items.push({ x: enemy.x, y: enemy.y, radius: 8, emoji: '🪙', type: 'gold', value: 2 + Math.floor(Math.random()*4) });
@@ -1121,6 +1214,18 @@ function startGame(type) {
         }
 
         function updateInteractables(dt) {
+            if (floorRule.hazard && enemies.length > 0) {
+                floorHazardTimer += dt;
+                if (floorHazardTimer >= 8000) {
+                    floorHazardTimer = 0;
+                    const hx = player.x + (Math.random() - 0.5) * 180;
+                    const hy = player.y + (Math.random() - 0.5) * 180;
+                    if (!checkWallCollision(hx, hy, 36)) {
+                        aoeZones.push({ x: hx, y: hy, radius: 72, timer: 1200, maxTimer: 1200, damage: 20 + currentFloor * 2, kind: 'curse' });
+                        visualEffects.push({ x: hx, y: hy, emoji: '☠️', size: 55, life: 20, maxLife: 20 });
+                    }
+                }
+            }
             for (let i = 0; i < traps.length; i++) {
                 let t = traps[i]; t.timer += dt;
                 if (t.timer > 2000) { t.active = !t.active; t.timer = 0; }
@@ -1133,7 +1238,7 @@ function startGame(type) {
                 let zone = aoeZones[i]; zone.timer -= dt;
                 if (zone.timer <= 0) {
                     visualEffects.push({ x: zone.x, y: zone.y, emoji: '💥', size: zone.radius * 2, life: 30, maxLife: 30 });
-                    if (distSq(player.x, player.y, zone.x, zone.y) < zone.radius**2) { player.hp -= zone.damage; player.hitFlash = 10; triggerShake(14); }
+                    if (distSq(player.x, player.y, zone.x, zone.y) < zone.radius**2) player.hp -= zone.damage;
                     fastRemove(aoeZones, i);
                 }
             }
@@ -1151,7 +1256,6 @@ function startGame(type) {
 
         function useUltimate() {
             if (player.ultCd > 0) return; player.ultCd = player.maxUltCd; const damage = player.damage * 5;
-            triggerShake(10);
             let angle = 0;
             if(isMobile) { angle = getMobileAutoAimAngle(); }
             else { let worldMouseX = screenMouseX + camera.x; let worldMouseY = screenMouseY + camera.y; angle = Math.atan2(worldMouseY - player.y, worldMouseX - player.x); }
@@ -1174,7 +1278,7 @@ function startGame(type) {
         function shoot(time, angle) {
             const currentAtkRate = player.buffs.frenzyTime > 0 ? player.atkRate / 3 : player.atkRate;
             if (time - player.attackCooldown >= currentAtkRate) {
-                let damage = player.damage;
+                let damage = player.damage * (floorRule.id === 'abyss' ? 1.08 : 1);
                 const passive = player.passives || {};
                 if (player.classType === 'warrior' && passive.berserk > 0 && player.hp <= player.maxHp * 0.5) {
                     damage *= 1 + passive.berserk * 0.10;
@@ -1459,28 +1563,1128 @@ function startGame(type) {
             ctx.restore();
         }
 
-        function drawShadow(x, y, radius, strength = 0.35) {
+        // ============================================================
+        // 플레이어 직업 벡터 드로잉 (drawWarrior 화풍 확장)
+        // 무사(drawWarrior)는 기존 그대로 유지하고, 나머지 4개 직업만 추가합니다.
+        // ============================================================
+
+        function drawGunner(x, y, size, alpha = 1.0) {
+            const s = size / 44;
             ctx.save();
-            ctx.globalAlpha = strength;
-            ctx.fillStyle = "#000";
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 트렌치코트 몸통
+            ctx.fillStyle = "#1b2130";
+            ctx.strokeStyle = "#050505";
+            ctx.lineWidth = 2.5;
             ctx.beginPath();
-            ctx.ellipse(x, y + radius * 0.72, radius * 0.9, radius * 0.34, 0, 0, Math.PI * 2);
+            ctx.roundRect(-14, 3, 28, 18, 5);
             ctx.fill();
+            ctx.stroke();
+
+            // 세운 옷깃 (양쪽)
+            ctx.fillStyle = "#262d40";
+            ctx.beginPath();
+            ctx.moveTo(-13, 2); ctx.lineTo(-4, -8); ctx.lineTo(-3, 4); ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(13, 2); ctx.lineTo(4, -8); ctx.lineTo(3, 4); ctx.closePath();
+            ctx.fill();
+
+            // 얼굴 (밝은 피부 — 원거리 캐릭터임을 대비로 강조)
+            ctx.fillStyle = "#e0b591";
+            ctx.strokeStyle = "#050505";
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.arc(0, -8, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 페도라 챙 + 크라운
+            ctx.fillStyle = "#101216";
+            ctx.beginPath();
+            ctx.ellipse(0, -14, 15, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.roundRect(-7, -23, 14, 10, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            // 날카로운 눈매
+            ctx.strokeStyle = "#111";
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.moveTo(-6, -8); ctx.lineTo(-2, -8);
+            ctx.moveTo(2, -8); ctx.lineTo(6, -8);
+            ctx.stroke();
+
+            // 벨트
+            ctx.strokeStyle = "#c9a227";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-12, 12); ctx.lineTo(12, 12);
+            ctx.stroke();
+
             ctx.restore();
         }
 
-        function triggerShake(mag) {
-            shakeMag = Math.max(shakeMag, mag);
+        function drawCleric(x, y, size, alpha = 1.0) {
+            const s = size / 44;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 로브 (넓게 퍼지는 실루엣)
+            ctx.fillStyle = "#ded4b8";
+            ctx.strokeStyle = "#050505";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(-8, -6); ctx.lineTo(8, -6); ctx.lineTo(17, 18); ctx.lineTo(-17, 18);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 로브 밑단 금색 장식선
+            ctx.strokeStyle = "#c9a227";
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.moveTo(-15, 15); ctx.lineTo(15, 15);
+            ctx.stroke();
+
+            // 후드 그림자 + 후드
+            ctx.fillStyle = "#1c1c1c";
+            ctx.beginPath();
+            ctx.arc(0, -9, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#c9bd9c";
+            ctx.strokeStyle = "#050505";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(0, -12, 13, Math.PI, 0);
+            ctx.lineTo(9, -4);
+            ctx.quadraticCurveTo(0, 2, -9, -4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 후드 안 은은한 눈빛
+            ctx.fillStyle = "#ffe9a8";
+            ctx.beginPath();
+            ctx.arc(-3.5, -9, 1.4, 0, Math.PI * 2);
+            ctx.arc(3.5, -9, 1.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 가슴의 성표
+            ctx.strokeStyle = "#ffd700";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 2); ctx.lineTo(0, 11);
+            ctx.moveTo(-4, 5.5); ctx.lineTo(4, 5.5);
+            ctx.stroke();
+
+            ctx.restore();
         }
 
-        function drawVignette(originX, originY) {
-            const maxR = Math.max(canvas.width, canvas.height) * 0.68;
-            const grad = ctx.createRadialGradient(originX, originY, maxR * 0.22, originX, originY, maxR);
-            grad.addColorStop(0, 'rgba(0,0,0,0)');
-            grad.addColorStop(0.55, 'rgba(0,0,0,0.30)');
-            grad.addColorStop(1, 'rgba(0,0,0,0.90)');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function drawCombatVampire(x, y, size, alpha = 1.0) {
+            const s = size / 44;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 뒤로 흩날리는 망토 (좌우)
+            ctx.fillStyle = "#160608";
+            ctx.strokeStyle = "#050505";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-6, -10); ctx.quadraticCurveTo(-20, 0, -14, 18); ctx.lineTo(-4, 10);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(6, -10); ctx.quadraticCurveTo(20, 0, 14, 18); ctx.lineTo(4, 10);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 날렵한 몸통
+            ctx.fillStyle = "#1a0d10";
+            ctx.beginPath();
+            ctx.roundRect(-9, -2, 18, 16, 5);
+            ctx.fill();
+            ctx.stroke();
+
+            // 세운 칼라 (뱀파이어 상징)
+            ctx.fillStyle = "#2a1216";
+            ctx.beginPath();
+            ctx.moveTo(-9, -3); ctx.lineTo(-2, -14); ctx.lineTo(-2, -1); ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(9, -3); ctx.lineTo(2, -14); ctx.lineTo(2, -1); ctx.closePath();
+            ctx.fill();
+
+            // 창백한 얼굴
+            ctx.fillStyle = "#d8cdd2";
+            ctx.strokeStyle = "#050505";
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.arc(0, -8, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 붉게 빛나는 눈
+            ctx.fillStyle = "#ff2740";
+            ctx.beginPath();
+            ctx.arc(-4, -8, 1.6, 0, Math.PI * 2);
+            ctx.arc(4, -8, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 송곳니
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.moveTo(-2, -3); ctx.lineTo(-1, 0); ctx.lineTo(0, -3); ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawMagicVampire(x, y, size, alpha = 1.0) {
+            const s = size / 44;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 넓게 퍼지는 로브 (전투 뱀파이어보다 둥근 실루엣)
+            ctx.fillStyle = "#241129";
+            ctx.strokeStyle = "#050505";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(-7, -4); ctx.lineTo(7, -4); ctx.lineTo(15, 18); ctx.lineTo(-15, 18);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 보라색 장식선
+            ctx.strokeStyle = "#a33dd6";
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.moveTo(-13, 14); ctx.lineTo(13, 14);
+            ctx.stroke();
+
+            // 뾰족한 마녀 모자 (성직자의 후드와 다른 실루엣)
+            ctx.fillStyle = "#1a0d20";
+            ctx.beginPath();
+            ctx.moveTo(-10, -8); ctx.lineTo(10, -8); ctx.lineTo(2, -30); ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.ellipse(0, -8, 12, 3.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 창백한 얼굴
+            ctx.fillStyle = "#cfc2d6";
+            ctx.beginPath();
+            ctx.arc(0, -6, 9, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 눈 (보라빛)
+            ctx.fillStyle = "#c81ee0";
+            ctx.beginPath();
+            ctx.arc(-3.2, -6, 1.4, 0, Math.PI * 2);
+            ctx.arc(3.2, -6, 1.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 손에 든 혈마법 구슬
+            ctx.fillStyle = "#d6206a";
+            ctx.strokeStyle = "#050505";
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.arc(13, 10, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
+            ctx.beginPath();
+            ctx.arc(11.5, 8.5, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // ============================================================
+        // 몬스터 벡터 드로잉 (drawWarrior 화풍 확장)
+        // ============================================================
+
+        function drawNormalEnemy(x, y, size, alpha = 1.0) {
+            const s = size / 36;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 누더기 몸통
+            ctx.fillStyle = "#4a5a3a";
+            ctx.strokeStyle = "#0a0a05";
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.roundRect(-9, 1, 18, 13, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            // 찢어진 옷자락
+            ctx.beginPath();
+            ctx.moveTo(-9, 14); ctx.lineTo(-6, 8); ctx.lineTo(-3, 14);
+            ctx.moveTo(3, 14); ctx.lineTo(6, 8); ctx.lineTo(9, 14);
+            ctx.fill();
+
+            // 머리 (한쪽으로 기울어짐)
+            ctx.fillStyle = "#5c6b46";
+            ctx.beginPath();
+            ctx.arc(1, -6, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 처진 팔
+            ctx.strokeStyle = "#4a5a3a";
+            ctx.lineWidth = 4;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(-9, 4); ctx.lineTo(-13, 13);
+            ctx.stroke();
+            ctx.lineCap = "butt";
+
+            // 흐리멍텅한 눈
+            ctx.fillStyle = "#c8d64a";
+            ctx.beginPath();
+            ctx.arc(-2, -6, 1.6, 0, Math.PI * 2);
+            ctx.arc(4, -7, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawEliteEnemy(x, y, size, alpha = 1.0) {
+            const s = size / 50;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 두꺼운 몸통 + 허리 천
+            ctx.fillStyle = "#8a2a20";
+            ctx.strokeStyle = "#1a0505";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.roundRect(-13, 3, 26, 16, 5);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "#3a2a1a";
+            ctx.fillRect(-13, 13, 26, 6);
+
+            // 머리
+            ctx.fillStyle = "#b23a2e";
+            ctx.beginPath();
+            ctx.arc(0, -8, 14, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 뿔 2개 (일반 몬스터보다 강해 보이는 핵심 요소)
+            ctx.fillStyle = "#e8e0c8";
+            ctx.beginPath();
+            ctx.moveTo(-9, -16); ctx.lineTo(-14, -30); ctx.lineTo(-4, -18); ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(9, -16); ctx.lineTo(14, -30); ctx.lineTo(4, -18); ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 화난 눈썹
+            ctx.strokeStyle = "#1a0505";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(-9, -12); ctx.lineTo(-2, -9);
+            ctx.moveTo(9, -12); ctx.lineTo(2, -9);
+            ctx.stroke();
+
+            // 눈
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.arc(-5, -7, 2.6, 0, Math.PI * 2);
+            ctx.arc(5, -7, 2.6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#1a0505";
+            ctx.beginPath();
+            ctx.arc(-5, -7, 1.2, 0, Math.PI * 2);
+            ctx.arc(5, -7, 1.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 송곳니
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.moveTo(-5, -1); ctx.lineTo(-3.5, 4); ctx.lineTo(-2, -1); ctx.closePath();
+            ctx.moveTo(5, -1); ctx.lineTo(3.5, 4); ctx.lineTo(2, -1); ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawRangedEnemy(x, y, size, alpha = 1.0) {
+            const s = size / 36;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 몸통 (가죽 갑옷)
+            ctx.fillStyle = "#3a4a34";
+            ctx.strokeStyle = "#0a0a05";
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.roundRect(-8, 0, 16, 14, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            // 등에 멘 화살통
+            ctx.fillStyle = "#5c4326";
+            ctx.beginPath();
+            ctx.roundRect(4, -6, 6, 14, 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.strokeStyle = "#cbb27a";
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(5, -6); ctx.lineTo(6, -12);
+            ctx.moveTo(8, -6); ctx.lineTo(9, -12);
+            ctx.stroke();
+
+            // 머리 + 두건
+            ctx.fillStyle = "#c99a68";
+            ctx.strokeStyle = "#0a0a05";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(-1, -6, 9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "#2e3a2a";
+            ctx.beginPath();
+            ctx.arc(-1, -8, 9.5, Math.PI * 1.05, Math.PI * 1.95);
+            ctx.closePath();
+            ctx.fill();
+
+            // 활 (몸 왼쪽 바깥으로 휘어진 형태 — 원거리 무기임을 즉시 알림)
+            ctx.strokeStyle = "#a9825a";
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.arc(-14, 4, 9, Math.PI - 0.7, Math.PI + 0.7);
+            ctx.stroke();
+            ctx.strokeStyle = "#e8ddb0";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-20.9, -1.8); ctx.lineTo(-20.9, 9.8);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawDashEnemy(x, y, size, alpha = 1.0) {
+            const s = size / 36;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 낮고 날렵한 몸통
+            ctx.fillStyle = "#33404a";
+            ctx.strokeStyle = "#050708";
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.moveTo(-14, 6);
+            ctx.quadraticCurveTo(-4, -4, 10, -2);
+            ctx.quadraticCurveTo(16, 0, 14, 6);
+            ctx.quadraticCurveTo(0, 12, -14, 6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 꼬리
+            ctx.beginPath();
+            ctx.moveTo(-14, 4);
+            ctx.quadraticCurveTo(-22, 0, -18, -8);
+            ctx.quadraticCurveTo(-14, -2, -12, 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 뾰족한 머리 + 귀
+            ctx.fillStyle = "#3d4c58";
+            ctx.beginPath();
+            ctx.moveTo(9, -5); ctx.lineTo(20, -1); ctx.lineTo(9, 3); ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(4, -6); ctx.lineTo(2, -13); ctx.lineTo(8, -7); ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 붉은 눈
+            ctx.fillStyle = "#ff3b30";
+            ctx.beginPath();
+            ctx.arc(13, -2, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 다리
+            ctx.strokeStyle = "#2a343d";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-8, 9); ctx.lineTo(-8, 15);
+            ctx.moveTo(6, 9); ctx.lineTo(6, 15);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawSummonerEnemy(x, y, size, alpha = 1.0) {
+            const s = size / 40;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 로브
+            ctx.fillStyle = "#3a2145";
+            ctx.strokeStyle = "#0a0510";
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            ctx.moveTo(-6, -4); ctx.lineTo(6, -4); ctx.lineTo(13, 16); ctx.lineTo(-13, 16);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 뾰족 모자
+            ctx.beginPath();
+            ctx.moveTo(-8, -6); ctx.lineTo(8, -6); ctx.lineTo(1, -26); ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.ellipse(0, -6, 10, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 얼굴
+            ctx.fillStyle = "#b7a6c2";
+            ctx.beginPath();
+            ctx.arc(0, -5, 7.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 눈 (초록빛 소환 마력)
+            ctx.fillStyle = "#7CFC00";
+            ctx.beginPath();
+            ctx.arc(-3, -5, 1.3, 0, Math.PI * 2);
+            ctx.arc(3, -5, 1.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 지팡이 + 소환 문양
+            ctx.strokeStyle = "#5c3a1a";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(11, -10); ctx.lineTo(11, 14);
+            ctx.stroke();
+            ctx.strokeStyle = "#7CFC00";
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.arc(11, -13, 4, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawSlime(x, y, size, alpha = 1.0) {
+            const s = size / 44;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 젤리 몸통 (윗부분이 물방울처럼 볼록볼록)
+            ctx.fillStyle = "#4fae5b";
+            ctx.strokeStyle = "#0a1a0a";
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.moveTo(-16, 6);
+            ctx.quadraticCurveTo(-18, -10, -8, -8);
+            ctx.quadraticCurveTo(-4, -16, 2, -8);
+            ctx.quadraticCurveTo(10, -14, 14, -4);
+            ctx.quadraticCurveTo(18, 4, 14, 12);
+            ctx.quadraticCurveTo(0, 18, -16, 6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 광택 하이라이트
+            ctx.fillStyle = "rgba(255,255,255,0.35)";
+            ctx.beginPath();
+            ctx.ellipse(-6, -3, 5, 3, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 눈
+            ctx.fillStyle = "#0a1a0a";
+            ctx.beginPath();
+            ctx.arc(-2, 4, 2, 0, Math.PI * 2);
+            ctx.arc(6, 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawGolem(x, y, size, alpha = 1.0) {
+            const s = size / 76;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 몸통 (돌덩이 블록)
+            ctx.fillStyle = "#6b6b6b";
+            ctx.strokeStyle = "#1c1c1c";
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.roundRect(-22, -2, 44, 32, 6);
+            ctx.fill();
+            ctx.stroke();
+
+            // 어깨 블록 (좌우)
+            ctx.fillStyle = "#5c5c5c";
+            ctx.beginPath();
+            ctx.roundRect(-32, -8, 16, 20, 5);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.roundRect(16, -8, 16, 20, 5);
+            ctx.fill();
+            ctx.stroke();
+
+            // 머리 (몸에 파묻힌 작은 돌덩이)
+            ctx.fillStyle = "#7a7a7a";
+            ctx.beginPath();
+            ctx.roundRect(-13, -22, 26, 22, 5);
+            ctx.fill();
+            ctx.stroke();
+
+            // 이끼 자국
+            ctx.fillStyle = "rgba(120,150,90,0.4)";
+            ctx.beginPath();
+            ctx.roundRect(-20, 14, 14, 10, 3);
+            ctx.fill();
+
+            // 갈라진 틈 (균열)
+            ctx.strokeStyle = "#2a2a2a";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-6, -2); ctx.lineTo(-2, 10); ctx.lineTo(4, 8);
+            ctx.moveTo(10, -18); ctx.lineTo(6, -10);
+            ctx.stroke();
+
+            // 빛나는 눈 (룬)
+            ctx.fillStyle = "#7fe8ff";
+            ctx.beginPath();
+            ctx.roundRect(-9, -14, 6, 3, 1);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.roundRect(3, -14, 6, 3, 1);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawBoss(x, y, size, alpha = 1.0) {
+            const s = size / 124;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            // 꼬리
+            ctx.fillStyle = "#1a1010";
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-20, 20);
+            ctx.quadraticCurveTo(-55, 35, -62, 10);
+            ctx.quadraticCurveTo(-45, 30, -18, 30);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 날개 (좌/우) + 막 혈관선
+            ctx.fillStyle = "#241414";
+            ctx.beginPath();
+            ctx.moveTo(-10, -6); ctx.lineTo(-58, -34); ctx.lineTo(-44, -6); ctx.lineTo(-52, 4); ctx.lineTo(-30, 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(10, -6); ctx.lineTo(58, -34); ctx.lineTo(44, -6); ctx.lineTo(52, 4); ctx.lineTo(30, 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.strokeStyle = "#5a1414";
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.moveTo(-12, -8); ctx.lineTo(-46, -20);
+            ctx.moveTo(12, -8); ctx.lineTo(46, -20);
+            ctx.stroke();
+
+            // 뒷다리
+            ctx.fillStyle = "#241414";
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.roundRect(-18, 14, 14, 18, 5);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.roundRect(6, 14, 14, 18, 5);
+            ctx.fill();
+            ctx.stroke();
+
+            // 발톱
+            ctx.fillStyle = "#e8e0c8";
+            for (const dx of [-16, -8, 4, 12]) {
+                ctx.beginPath();
+                ctx.moveTo(dx, 31); ctx.lineTo(dx + 3, 36); ctx.lineTo(dx + 6, 31);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 몸통 + 배
+            ctx.fillStyle = "#301818";
+            ctx.beginPath();
+            ctx.ellipse(0, 4, 26, 18, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "#8a1c1c";
+            ctx.beginPath();
+            ctx.ellipse(0, 10, 14, 9, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 등 가시 (척추 스파이크)
+            ctx.fillStyle = "#3a2020";
+            for (let i = 0; i < 5; i++) {
+                const px = -18 + i * 9;
+                ctx.beginPath();
+                ctx.moveTo(px, -12);
+                ctx.lineTo(px + 4, -22 - i);
+                ctx.lineTo(px + 8, -12);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 목
+            ctx.fillStyle = "#301818";
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-10, -14); ctx.lineTo(-4, -38); ctx.lineTo(12, -38); ctx.lineTo(14, -14);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 머리 + 턱
+            ctx.fillStyle = "#241414";
+            ctx.beginPath();
+            ctx.moveTo(-8, -38); ctx.lineTo(4, -52); ctx.lineTo(22, -48); ctx.lineTo(24, -36); ctx.lineTo(10, -30);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "#140a0a";
+            ctx.beginPath();
+            ctx.moveTo(10, -30); ctx.lineTo(26, -32); ctx.lineTo(22, -24); ctx.lineTo(8, -26);
+            ctx.closePath();
+            ctx.fill();
+
+            // 이빨
+            ctx.fillStyle = "#f0e8d0";
+            ctx.beginPath();
+            ctx.moveTo(12, -29); ctx.lineTo(14, -24); ctx.lineTo(16, -29); ctx.closePath();
+            ctx.moveTo(18, -29); ctx.lineTo(20, -25); ctx.lineTo(22, -30); ctx.closePath();
+            ctx.fill();
+
+            // 뿔 2개
+            ctx.fillStyle = "#e8e0c8";
+            ctx.beginPath();
+            ctx.moveTo(2, -50); ctx.lineTo(-4, -66); ctx.lineTo(8, -52); ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(14, -48); ctx.lineTo(16, -64); ctx.lineTo(22, -46); ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 눈 + 콧구멍
+            ctx.fillStyle = "#ff3020";
+            ctx.beginPath();
+            ctx.arc(10, -40, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.arc(20, -37, 1.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // ============================================================
+        // 무기 벡터 드로잉 (플레이어 옆에서 조준 방향으로 회전 표시됨)
+        // ============================================================
+
+        function drawGun(x, y, size, alpha = 1.0) {
+            const s = size / 24;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "#1c1c1e";
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.roundRect(-11, -3, 18, 5, 1.5);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-8, 2); ctx.lineTo(-11, 11); ctx.lineTo(-4, 11); ctx.lineTo(-3, 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.arc(-4, 4, 3, 0, Math.PI);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawSword(x, y, size, alpha = 1.0) {
+            const s = size / 24;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "#d8d8dc";
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-13, 0); ctx.lineTo(9, -3); ctx.lineTo(9, 3); ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "#8a6a1a";
+            ctx.beginPath();
+            ctx.roundRect(8, -4.5, 2.5, 9, 1);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "#3a2a1a";
+            ctx.beginPath();
+            ctx.roundRect(10.5, -1.8, 7, 3.6, 1.5);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawStaff(x, y, size, alpha = 1.0) {
+            const s = size / 24;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.strokeStyle = "#6b4a24";
+            ctx.lineWidth = 3;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(-12, 6); ctx.lineTo(10, -6);
+            ctx.stroke();
+            ctx.lineCap = "butt";
+
+            ctx.fillStyle = "#ffe9a8";
+            ctx.strokeStyle = "#8a6a00";
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.arc(11, -8, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "rgba(255,255,255,0.6)";
+            ctx.beginPath();
+            ctx.arc(9.5, -9.5, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawClaw(x, y, size, alpha = 1.0) {
+            const s = size / 24;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "#3a0a10";
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-11, 3);
+            ctx.quadraticCurveTo(0, -9, 11, -3);
+            ctx.quadraticCurveTo(2, -3, -9, 6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = "#ff2740";
+            ctx.beginPath();
+            ctx.arc(-9, 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawOrbStaff(x, y, size, alpha = 1.0) {
+            const s = size / 24;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.strokeStyle = "#241029";
+            ctx.lineWidth = 3;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(-10, 7); ctx.lineTo(6, -5);
+            ctx.stroke();
+            ctx.lineCap = "butt";
+
+            ctx.strokeStyle = "#a33dd6";
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.arc(8, -8, 6, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = "#d6206a";
+            ctx.beginPath();
+            ctx.arc(8, -8, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
+            ctx.beginPath();
+            ctx.arc(6.5, -9.5, 1.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawPlayerWeapon(classType, x, y, size, alpha = 1.0) {
+            if (classType === 'gunner') drawGun(x, y, size, alpha);
+            else if (classType === 'warrior') drawSword(x, y, size, alpha);
+            else if (classType === 'cleric') drawStaff(x, y, size, alpha);
+            else if (classType === 'combat_vamp') drawClaw(x, y, size, alpha);
+            else if (classType === 'magic_vamp') drawOrbStaff(x, y, size, alpha);
+        }
+
+        // ============================================================
+        // 투사체 벡터 드로잉 (2~6개의 단순 도형만 사용 — 동시에 수십~수백개가
+        // 그려질 수 있으므로 gradient/shadowBlur 등 무거운 효과는 쓰지 않습니다)
+        // ============================================================
+
+        function drawGustProjectile(x, y, size, alpha = 1.0) {
+            const s = size / 20;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "#dfeaf5";
+            ctx.strokeStyle = "rgba(20,30,40,0.5)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-9, 0); ctx.lineTo(6, -3); ctx.lineTo(9, 0); ctx.lineTo(6, 3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.strokeStyle = "rgba(255,255,255,0.6)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-8, -3); ctx.lineTo(-2, -3);
+            ctx.moveTo(-8, 3); ctx.lineTo(-2, 3);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawCrescentProjectile(x, y, size, alpha = 1.0) {
+            const s = size / 20;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "#dfe6ff";
+            ctx.beginPath();
+            ctx.arc(0, 0, 9, Math.PI * 0.25, Math.PI * 1.35, false);
+            ctx.arc(3, 0, 7, Math.PI * 1.35, Math.PI * 0.25, true);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255,255,255,0.7)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawCometProjectile(x, y, size, alpha = 1.0) {
+            const s = size / 20;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "rgba(255,220,120,0.55)";
+            ctx.beginPath();
+            ctx.moveTo(-3, -3); ctx.lineTo(-13, 0); ctx.lineTo(-3, 3);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "#fff4cf";
+            ctx.strokeStyle = "#c98a1a";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawBatProjectile(x, y, size, alpha = 1.0) {
+            const s = size / 20;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "#1c0f14";
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 3.5, 2.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-2, -1); ctx.lineTo(-11, -6); ctx.lineTo(-3, 1); ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(2, -1); ctx.lineTo(11, -6); ctx.lineTo(3, 1); ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawBladeProjectile(x, y, size, alpha = 1.0) {
+            const s = size / 20;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "#c81e3a";
+            ctx.strokeStyle = "#1a0505";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-9, 0); ctx.lineTo(6, -2.5); ctx.lineTo(6, 2.5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "#3a1a1a";
+            ctx.beginPath();
+            ctx.roundRect(6, -1.6, 4, 3.2, 1);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawWaveProjectile(x, y, size, alpha = 1.0) {
+            const s = size / 20;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "rgba(70,140,220,0.55)";
+            ctx.beginPath();
+            ctx.moveTo(-9, 6);
+            ctx.quadraticCurveTo(-4, -8, 4, -3);
+            ctx.quadraticCurveTo(9, -1, 9, 6);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = "rgba(255,255,255,0.75)";
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(-8, -1); ctx.quadraticCurveTo(-2, -8, 5, -4);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawOrbProjectile(x, y, size, alpha = 1.0) {
+            const s = size / 20;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.strokeStyle = "rgba(163,61,214,0.65)";
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.arc(0, 0, 7, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = "#8a1e9e";
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,0.55)";
+            ctx.beginPath();
+            ctx.arc(-1.6, -1.6, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawFireballProjectile(x, y, size, alpha = 1.0) {
+            const s = size / 20;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = "rgba(255,120,20,0.5)";
+            ctx.beginPath();
+            ctx.moveTo(0, -9); ctx.lineTo(3, -2); ctx.lineTo(9, 0); ctx.lineTo(3, 2);
+            ctx.lineTo(0, 9); ctx.lineTo(-3, 2); ctx.lineTo(-9, 0); ctx.lineTo(-3, -2);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "#ffcf3a";
+            ctx.strokeStyle = "#a83c00";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore();
         }
 
         function drawEmoji(emoji, x, y, size, alpha = 1.0) {
@@ -1492,6 +2696,35 @@ function startGame(type) {
                 drawCoin(x, y, size, alpha);
                 return;
             }
+
+            // 플레이어 직업 (classData의 값을 그대로 참조하므로 ZWJ 결합 이모지를
+            // 재입력할 필요가 없어 안전합니다)
+            if (emoji === classData.gunner.emoji) { drawGunner(x, y, size, alpha); return; }
+            if (emoji === classData.cleric.emoji) { drawCleric(x, y, size, alpha); return; }
+            if (emoji === classData.combat_vamp.emoji) { drawCombatVampire(x, y, size, alpha); return; }
+            if (emoji === classData.magic_vamp.emoji) { drawMagicVampire(x, y, size, alpha); return; }
+
+            // 몬스터 (단일 코드포인트 이모지라 직접 비교해도 안전합니다)
+            if (emoji === "🧟") { drawNormalEnemy(x, y, size, alpha); return; }
+            if (emoji === "👹") { drawEliteEnemy(x, y, size, alpha); return; }
+            if (emoji === "🏹") { drawRangedEnemy(x, y, size, alpha); return; }
+            if (emoji === "🐺") { drawDashEnemy(x, y, size, alpha); return; }
+            if (emoji === "🦠") { drawSlime(x, y, size, alpha); return; }
+            if (emoji === "🗿") { drawGolem(x, y, size, alpha); return; }
+            if (emoji === "🐉") { drawBoss(x, y, size, alpha); return; }
+            // 소환사는 classData에 없는 몬스터 전용 이모지라, ZWJ 결합 문자를 다시
+            // 입력하는 위험을 피해 기본 마법사 이모지 + 여성 기호 유무로 판별합니다.
+            if (emoji.indexOf("🧙") === 0 && emoji.indexOf("♀") !== -1) { drawSummonerEnemy(x, y, size, alpha); return; }
+
+            // 투사체 (플레이어 투사체는 classData 값을 참조)
+            if (emoji === classData.gunner.projEmoji) { drawGustProjectile(x, y, size, alpha); return; }
+            if (emoji === classData.warrior.projEmoji) { drawCrescentProjectile(x, y, size, alpha); return; }
+            if (emoji === classData.cleric.projEmoji) { drawCometProjectile(x, y, size, alpha); return; }
+            if (emoji === classData.combat_vamp.projEmoji) { drawBladeProjectile(x, y, size, alpha); return; }
+            if (emoji === classData.magic_vamp.projEmoji) { drawOrbProjectile(x, y, size, alpha); return; }
+            if (emoji === "🦇") { drawBatProjectile(x, y, size, alpha); return; }
+            if (emoji === "🌊") { drawWaveProjectile(x, y, size, alpha); return; }
+            if (emoji === "🔥") { drawFireballProjectile(x, y, size, alpha); return; }
 
             // [최적화 2] 공통 스타일 설정을 간소화하여 성능 향상
             ctx.globalAlpha = alpha;
@@ -1513,8 +2746,6 @@ function update(dt, time) {
             updateProjectiles(dt, time);
             let needSkillUpdate = updateEnemies(dt, time);
             updateInteractables(dt);
-            if (shakeMag > 0) shakeMag = Math.max(0, shakeMag - dt * 0.08);
-            if (player.hitFlash > 0) player.hitFlash--;
 
             if (visualEffects.length > 80) visualEffects.splice(0, visualEffects.length - 80);
             if (projectiles.length > 150) projectiles.splice(0, projectiles.length - 150);
@@ -1528,34 +2759,19 @@ function update(dt, time) {
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
-            const zoom = getZoom();
-            if (isMobile) ctx.scale(zoom, zoom);
-            let shakeX = 0, shakeY = 0;
-            if (shakeMag > 0.4) { shakeX = (Math.random() - 0.5) * shakeMag; shakeY = (Math.random() - 0.5) * shakeMag; }
-            ctx.translate(-camera.x + shakeX, -camera.y + shakeY);
+            if (isMobile) ctx.scale(getZoom(), getZoom());
+            ctx.translate(-camera.x, -camera.y);
 
-            const viewWorldW = canvas.width / zoom;
-            const viewWorldH = canvas.height / zoom;
+            const viewWorldW = canvas.width / getZoom();
+            const viewWorldH = canvas.height / getZoom();
             let startCol = Math.max(0, Math.floor(camera.x / tileSize)); let endCol = Math.min(mapCols, Math.floor((camera.x + viewWorldW) / tileSize) + 1);
             let startRow = Math.max(0, Math.floor(camera.y / tileSize)); let endRow = Math.min(mapRows, Math.floor((camera.y + viewWorldH) / tileSize) + 1);
 
             for (let r = startRow; r < endRow; r++) {
                 for (let c = startCol; c < endCol; c++) {
                     let tx = c * tileSize; let ty = r * tileSize;
-                    const noise = (c * 37 + r * 17) % 5;
-                    if (mapGrid[r][c] === 1) {
-                        const shade = 13 + noise * 3;
-                        ctx.fillStyle = `rgb(${shade},${shade},${shade + 3})`;
-                        ctx.fillRect(tx, ty, tileSize, tileSize);
-                        ctx.strokeStyle = '#050505'; ctx.strokeRect(tx, ty, tileSize, tileSize);
-                        ctx.fillStyle = 'rgba(255,255,255,0.035)';
-                        ctx.fillRect(tx, ty, tileSize, 3);
-                    } else {
-                        const shade = 29 + noise * 3;
-                        ctx.fillStyle = `rgb(${shade},${shade + 3},${shade + 7})`;
-                        ctx.fillRect(tx, ty, tileSize, tileSize);
-                        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.strokeRect(tx, ty, tileSize, tileSize);
-                    }
+                    if (mapGrid[r][c] === 1) { ctx.fillStyle = '#111'; ctx.fillRect(tx, ty, tileSize, tileSize); ctx.strokeStyle = '#222'; ctx.strokeRect(tx, ty, tileSize, tileSize); }
+                    else { ctx.fillStyle = '#22252a'; ctx.fillRect(tx, ty, tileSize, tileSize); ctx.strokeStyle = '#1a1a20'; ctx.strokeRect(tx, ty, tileSize, tileSize); }
                 }
             }
 
@@ -1573,40 +2789,43 @@ function update(dt, time) {
             traps.forEach(t => drawTrap(t.x, t.y, 40, t.active));
             breakables.forEach(b => drawEmoji(b.emoji, b.x, b.y, b.radius * 2));
 
-            aoeZones.forEach(z => { ctx.fillStyle = 'rgba(255, 0, 0, 0.2)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI*2); ctx.fill(); let progress = Math.max(0, 1 - (z.timer / z.maxTimer)); ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.radius * progress, 0, Math.PI*2); ctx.fill(); });
+            aoeZones.forEach(z => { const isCurse = z.kind === 'curse'; const base = isCurse ? 'rgba(170, 70, 255, 0.18)' : 'rgba(255, 0, 0, 0.2)'; const inner = isCurse ? 'rgba(190, 90, 255, 0.42)' : 'rgba(255, 0, 0, 0.4)'; ctx.fillStyle = base; ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI*2); ctx.fill(); let progress = Math.max(0, 1 - (z.timer / z.maxTimer)); ctx.fillStyle = inner; ctx.beginPath(); ctx.arc(z.x, z.y, z.radius * progress, 0, Math.PI*2); ctx.fill(); });
 
             stageProps.forEach(prop => drawEmoji(prop.emoji, prop.x, prop.y, prop.size, 0.3));
-            items.forEach(item => {
-                if (item.type === 'equip' || item.type === 'rare_equip') {
-                    ctx.save();
-                    ctx.shadowColor = item.type === 'rare_equip' ? 'rgba(76,140,255,0.75)' : 'rgba(255,215,0,0.65)';
-                    ctx.shadowBlur = 16;
-                    drawEmoji(item.emoji, item.x, item.y, item.radius * 2);
-                    ctx.restore();
-                } else {
-                    drawEmoji(item.emoji, item.x, item.y, item.radius * 2);
-                }
-            });
+            items.forEach(item => drawEmoji(item.emoji, item.x, item.y, item.radius * 2));
             enemies.forEach(e => {
-                drawShadow(e.x, e.y, e.radius);
-                if (e.hitFlash > 0) {
+                if (e.type === 'boss') {
                     ctx.save();
-                    ctx.globalAlpha = Math.min(0.6, (e.hitFlash / 6) * 0.6);
-                    ctx.fillStyle = '#fff';
+                    ctx.strokeStyle = e.phase2 ? 'rgba(255,60,30,.75)' : 'rgba(255,140,30,.55)';
+                    ctx.lineWidth = 4;
                     ctx.beginPath();
-                    ctx.arc(e.x, e.y, e.radius * 1.15, 0, Math.PI * 2);
-                    ctx.fill();
+                    ctx.arc(e.x, e.y, e.radius + 10 + Math.sin(performance.now()/180)*4, 0, Math.PI*2);
+                    ctx.stroke();
+                    ctx.restore();
+                } else if (e.type === 'golem') {
+                    ctx.save();
+                    ctx.strokeStyle = e.enraged ? 'rgba(255,80,30,.8)' : 'rgba(180,180,180,.55)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, e.radius + 5, 0, Math.PI*2);
+                    ctx.stroke();
                     ctx.restore();
                 }
                 drawEmoji(e.emoji, e.x, e.y, e.radius * 2);
-                if (e.type === 'elite') { ctx.strokeStyle = 'rgba(255,140,0,0.75)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 6, 0, Math.PI*2); ctx.stroke(); }
-                else if (e.type === 'boss') { ctx.strokeStyle = 'rgba(255,40,40,0.55)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 10, 0, Math.PI*2); ctx.stroke(); }
-                const barW = 30, barX = e.x - barW/2, barY = e.y - e.radius - 12;
-                const pct = Math.max(0, e.hp / e.maxHp);
-                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.roundRect(barX - 1, barY - 1, barW + 2, 6, 3); ctx.fill();
-                ctx.fillStyle = '#3a0d0d'; ctx.beginPath(); ctx.roundRect(barX, barY, barW, 4, 2); ctx.fill();
-                const hpColor = pct > 0.5 ? '#4CAF50' : pct > 0.25 ? '#ffcc00' : '#ff3333';
-                ctx.fillStyle = hpColor; ctx.beginPath(); ctx.roundRect(barX, barY, barW * pct, 4, 2); ctx.fill();
+                const barW = e.type === 'boss' ? 80 : e.type === 'golem' ? 55 : 30;
+                ctx.fillStyle = 'red'; ctx.fillRect(e.x-barW/2, e.y-e.radius-12, barW, 5);
+                ctx.fillStyle = '#00ff00'; ctx.fillRect(e.x-barW/2, e.y-e.radius-12, barW*Math.max(0,e.hp/e.maxHp), 5);
+                if (e.type === 'boss') {
+                    ctx.fillStyle = '#ffb347';
+                    ctx.font = "bold 13px 'Gowun Dodum'";
+                    ctx.textAlign = 'center';
+                    ctx.fillText(e.bossName || 'BOSS', e.x, e.y - e.radius - 20);
+                } else if (e.type === 'golem') {
+                    ctx.fillStyle = '#d0d0d0';
+                    ctx.font = "bold 11px 'Gowun Dodum'";
+                    ctx.textAlign = 'center';
+                    ctx.fillText('고대 골렘', e.x, e.y - e.radius - 19);
+                }
             });
 
             projectiles.forEach(p => drawEmoji(p.emoji, p.x, p.y, p.radius * 2));
@@ -1619,7 +2838,7 @@ function update(dt, time) {
             ctx.save();
             ctx.translate(player.x, player.y);
             ctx.rotate(angle);
-            drawEmoji(player.weapon, 32, 0, 24);
+            drawPlayerWeapon(player.classType, 32, 0, 24);
             ctx.restore();
 
             // 현재 공격 방향을 희미하게 표시해 모바일 조준 상태를 즉시 알 수 있게 합니다.
@@ -1634,16 +2853,6 @@ function update(dt, time) {
                 ctx.restore();
             }
 
-            drawShadow(player.x, player.y, player.radius, 0.4);
-            if (player.hitFlash > 0) {
-                ctx.save();
-                ctx.globalAlpha = Math.min(0.5, (player.hitFlash / 8) * 0.5);
-                ctx.fillStyle = '#ff3030';
-                ctx.beginPath();
-                ctx.arc(player.x, player.y, player.radius * 1.3, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            }
             drawEmoji(player.emoji, player.x, player.y, player.radius * 2.2);
 
             if (player.buffs.frenzyTime > 0) { ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(player.x, player.y, player.radius + 10, 0, Math.PI*2); ctx.stroke(); }
@@ -1657,10 +2866,6 @@ function update(dt, time) {
 
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(player.x + Math.cos(angle)*45, player.y + Math.sin(angle)*45); ctx.lineTo(player.x + Math.cos(angle)*70, player.y + Math.sin(angle)*70); ctx.stroke();
             ctx.restore();
-
-            const playerScreenX = (player.x - camera.x) * zoom + shakeX * zoom;
-            const playerScreenY = (player.y - camera.y) * zoom + shakeY * zoom;
-            drawVignette(playerScreenX, playerScreenY);
 
             if (isMobile) {
                 ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
