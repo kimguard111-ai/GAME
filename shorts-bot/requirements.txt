@@ -1,0 +1,8 @@
+anthropic>=0.70
+streamlit>=1.38
+pillow>=10.0
+edge-tts>=6.1
+feedparser>=6.0
+beautifulsoup4>=4.12
+requests>=2.31
+imageio-ffmpeg>=0.5
